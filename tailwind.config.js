@@ -5,7 +5,7 @@
 module.exports = {
   content: [
     "./App.{js,jsx,ts,tsx}",
-    "./<custom directory>/**/*.{js,jsx,ts,tsx}",
+    "./src/**/*.{js,jsx,ts,tsx}",
   ],
   theme: {
     extend: {
@@ -14,16 +14,17 @@ module.exports = {
         purple: "#7e5bef",
         pink: "#ff49db",
         orange: "#ff7849",
-        green: "##0DA63E",
+        green: "#0DA63E",
         yellow: "#ffc82c",
         "gray-dark": "#273444",
         gray: "#8492a6",
         "gray-light": "#d3dce6",
       },
       fontFamily: {
-        regular: "Roboto_400Regular",
-        bold: "Roboto_700Bold",
-        medium: "Roboto_500Medium",
+        regular: "Montserrat_400Regular",
+        medium: "Montserrat_500Medium",
+        semiBold: "Montserrat_600SemiBold",
+        bold: "Montserrat_700Bold",
       },
     },
   },

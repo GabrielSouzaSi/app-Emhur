@@ -1,6 +1,4 @@
 import React, { useEffect } from "react";
-import { StatusBar } from "expo-status-bar";
-import { Text, View } from "react-native";
 import {
   useFonts,
   Montserrat_400Regular,
@@ -9,6 +7,8 @@ import {
   Montserrat_700Bold,
 } from "@expo-google-fonts/montserrat";
 import * as SplashScreen from "expo-splash-screen";
+
+import { Login } from "@screens/login";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -32,9 +32,8 @@ export default function App() {
     prepare();
   }, []);
   return (
-    <View className="flex-1 items-center justify-center bg-white">
-      <Text className="">Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <>
+    {isFontLoaded ? <Login /> : <></>}
+    </>
   );
 }
