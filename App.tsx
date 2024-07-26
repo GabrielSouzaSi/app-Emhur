@@ -9,6 +9,7 @@ import {
 import * as SplashScreen from "expo-splash-screen";
 
 import { Login } from "@screens/login";
+import { Loading } from "@components/Loading";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -33,7 +34,7 @@ export default function App() {
   }, []);
   return (
     <>
-    {isFontLoaded ? <Login /> : <></>}
+    {isFontLoaded ? <Login /> : <Loading />}
     </>
   );
 }
