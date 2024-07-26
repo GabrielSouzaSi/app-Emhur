@@ -1,3 +1,4 @@
+import { StatusBar } from "react-native";
 import React, { useEffect } from "react";
 import {
   useFonts,
@@ -9,6 +10,8 @@ import {
 import * as SplashScreen from "expo-splash-screen";
 
 import { Login } from "@screens/login";
+import { Loading } from "@components/Loading";
+import { HomeFiscal} from "@screens/HomeFiscal";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -33,7 +36,12 @@ export default function App() {
   }, []);
   return (
     <>
-    {isFontLoaded ? <Login /> : <></>}
+    <StatusBar 
+    barStyle="dark-content"
+    backgroundColor="transparent"
+    translucent
+    />
+    {isFontLoaded ? <HomeFiscal /> : <Loading />}
     </>
   );
 }
