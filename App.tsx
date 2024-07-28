@@ -9,7 +9,7 @@ import {
 } from "@expo-google-fonts/montserrat";
 import * as SplashScreen from "expo-splash-screen";
 
-import { Login } from "@screens/login";
+import { Login } from "@screens/Login";
 import { Loading } from "@components/Loading";
 import { HomeFiscal} from "@screens/HomeFiscal";
 
