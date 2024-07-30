@@ -4,12 +4,14 @@ import {
   TouchableOpacity,
   TouchableOpacityProps,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { SignOut } from "phosphor-react-native";
 import colors from "tailwindcss/colors";
 
 type Props = TouchableOpacityProps;
 
 export function HeaderMenu({ ...rest }: Props) {
+  const router = useRouter();
   return (
     <View
       className="bg-white shadow-slate-700 mt-10 w-full flex flex-row justify-between items-center p-3"
@@ -17,7 +19,7 @@ export function HeaderMenu({ ...rest }: Props) {
     >
       <Image className="" source={require("@assets/emhurMenu.png")} />
       <Image className="" source={require("@assets/prefeituraMenu.png")} />
-      <TouchableOpacity>
+      <TouchableOpacity onPress={() => router.back()}>
         <SignOut size={30} color={colors.green[500]} />
       </TouchableOpacity>
     </View>

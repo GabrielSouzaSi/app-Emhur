@@ -2,7 +2,7 @@ import { View } from "react-native";
 import { HeaderMenu } from "@components/HeaderMenu";
 import { MenuCard } from "@components/MenuCard";
 
-export function HomePermissionario() {
+export default function Profile1() {
   return (
     <View className="flex-1 bg-slate-50">
         <HeaderMenu />
