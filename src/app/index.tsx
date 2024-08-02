@@ -1,46 +1,67 @@
-import { SafeAreaView, StatusBar } from "react-native";
-import React, { useEffect } from "react";
 import {
-  useFonts,
-  Montserrat_400Regular,
-  Montserrat_500Medium,
-  Montserrat_600SemiBold,
-  Montserrat_700Bold,
-} from "@expo-google-fonts/montserrat";
-import * as SplashScreen from "expo-splash-screen";
+  Image,
+  Text,
+  View,
+  TextInput,
+  Pressable,
+  TouchableOpacity,
+} from "react-native";
+import { useRouter, Link } from "expo-router";
+import { Header } from "@components/header";
+import { Field } from "@/components/input";
+import { Button } from "@/components/button";
 
-import { Loading } from "@components/Loading";
-import Login  from "@/app/login";
+export default function Login() {
+  const router = useRouter();
 
-SplashScreen.preventAutoHideAsync();
-
-export default function Index() {
-  const [isFontLoaded] = useFonts({
-    Montserrat_400Regular,
-    Montserrat_500Medium,
-    Montserrat_600SemiBold,
-    Montserrat_700Bold,
-  });
-
-  useEffect(() => {
-    async function prepare() {
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        SplashScreen.hideAsync();
-      } catch (e) {
-        console.warn(e);
-      }
-    }
-    prepare();
-  }, []);
   return (
     <>
-    <StatusBar 
-    barStyle="dark-content"
-    backgroundColor="transparent"
-    translucent
-    />
-    {isFontLoaded ? <Login /> : <Loading />}
+      <Header title="Login" />
+
+      <View className="p-8">
+
+        <View className="items-center mb-10">
+          <Image className="mb-5" source={require("@assets/prefeitura.png")} />
+          <Image source={require("@assets/emhur.png")} />
+        </View>
+
+        <View>
+          <Field
+            className="mb-5"
+            placeholder="E-mail, Matricula, Codigo"
+            variant="secundary"
+          />
+          <Field placeholder="Senha" variant="secundary" />
+        </View>
+
+        <Pressable className="my-7 items-end">
+          <Text className="font-regular font-bold text-base text-green-500">
+            Esqueceu a senha?
+          </Text>
+        </Pressable>
+
+        <Button variant="primary">
+          <Button.TextButton title="Entrar" />
+        </Button>
+
+        <View className="mt-7 items-center">
+          <Link
+            href={"/(fiscal)"}
+            className="mb-5 font-regular font-bold text-base text-green-500"
+          >
+            Ambiante do Fiscal
+          </Link>
+
+          <Pressable
+            className="mb-3"
+            onPress={() => router.push("/permissionario")}
+          >
+            <Text className="font-regular font-bold text-base text-green-500">
+              Ambiente do Permissionário
+            </Text>
+          </Pressable>
+        </View>
+      </View>
     </>
   );
 }

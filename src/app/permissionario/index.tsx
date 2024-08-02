@@ -1,19 +1,20 @@
 import { View } from "react-native";
-import { HeaderMenu } from "@components/HeaderMenu";
-import { MenuCard } from "@components/MenuCard";
+import { HeaderMenu } from "@components/headerMenu";
+import { MenuCard } from "@components/menuCard";
 
-export default function Profile1() {
+export default function Permissionario() {
+
   return (
-    <View className="flex-1 bg-slate-50">
+    <>
         <HeaderMenu />
-        <View className="mt-4 flex flex-row justify-between px-2">
-        <MenuCard title="Alvará" icon="UserCircle"/>
-        <MenuCard title="Serviços" icon="CheckSquare"/>
-        <MenuCard title="Credencial" icon="Car"/>
+        <View className="mt-4 flex flex-row justify-between px-5">
+        <MenuCard title="Alvará" icon="file-check-outline"/>
+        <MenuCard title="Serviços" icon="view-grid-outline"/>
+        <MenuCard title="Credencial" icon="card-account-details-outline"/>
         </View>
-        <View className="mt-4 flex flex-row justify-between px-2">
-        <MenuCard title="Agendamento" icon="UserCircle"/>
+        <View className="mt-4 flex flex-row justify-between px-5">
+        <MenuCard title="Agendamento" icon="calendar-outline"/>
         </View>
-    </View>
+    </>
   );
 }
