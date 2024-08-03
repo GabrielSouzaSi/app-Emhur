@@ -11,7 +11,7 @@ import styles from "@/styles/shadow";
 type Variants = "primary"|"secundary"
 
 type Props = TouchableOpacityProps & {
-  variant: Variants;
+  variant?: Variants;
 }
 
 export function HeaderMenu({variant="secundary", ...rest }: Props) {

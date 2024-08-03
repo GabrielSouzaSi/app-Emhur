@@ -54,7 +54,7 @@ export default function Login() {
 
           <Pressable
             className="mb-3"
-            onPress={() => router.push("/permissionario")}
+            onPress={() => router.push("/(permissionario)")}
           >
             <Text className="font-regular font-bold text-base text-green-500">
               Ambiente do Permissionário

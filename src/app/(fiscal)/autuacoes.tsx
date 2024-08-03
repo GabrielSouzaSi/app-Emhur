@@ -2,14 +2,10 @@ import { useState } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
-  TextInput,
   ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { ArrowLeft } from "phosphor-react-native";
 import { Picker } from "@react-native-picker/picker";
-import colors from "tailwindcss/colors";
 import { HeaderBack } from "@/components/headerBack";
 import { Field } from "@/components/input";
 import { Button } from "@/components/button";

@@ -15,8 +15,18 @@ export default function HomeFiscal() {
           icon="shield-account-outline"
           variant="primary"
         />
-        <MenuCard title="Vistoria" icon="checkbox-outline" variant="primary" />
-        <MenuCard title="Veículo" icon="car-outline" variant="primary" />
+        <MenuCard
+          onPress={() => router.push("/(fiscal)/menuVistoria")}
+          title="Vistoria"
+          icon="checkbox-outline"
+          variant="primary"
+        />
+        <MenuCard
+          onPress={() => router.push("/(fiscal)/veiculo")}
+          title="Veículo"
+          icon="car-outline"
+          variant="primary"
+        />
       </View>
     </>
   );

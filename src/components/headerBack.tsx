@@ -14,7 +14,7 @@ type Variants = "primary" | "secundary";
 
 type Props = TouchableOpacityProps & {
   title: string;
-  variant: Variants;
+  variant?: Variants;
 };
 
 export function HeaderBack({
