@@ -5,9 +5,13 @@ import {
   ScrollView,
   FlatList,
   TouchableOpacity,
+  Image,
+  Pressable,
 } from "react-native";
 import { useRouter } from "expo-router";
 import RadioGroup, { RadioButtonProps } from "react-native-radio-buttons-group";
+import * as ImagePicker from "expo-image-picker";
+
 import { HeaderBack } from "@/components/headerBack";
 import { Field } from "@/components/input";
 import { Button } from "@/components/button";
@@ -242,9 +246,12 @@ const DATA = [
   },
 ];
 
+
+
 enum MODAL {
   NONE = 0,
-  MODAL = 1,
+  IMAGENS = 1,
+  INFRACAO = 2
 }
 type ListCod = {
   id: string;
@@ -254,7 +261,9 @@ type ListCod = {
 export default function Autuacaoes() {
   const router = useRouter();
   // Mode de Abordagem
+
   const [selectedId, setSelectedId] = useState<string | undefined>();
+
   // Informações do Veiculo
   const [placa, setPlaca] = useState("");
   const [numeroVeiculo, setNumeroVeiculo] = useState("");
@@ -262,7 +271,7 @@ export default function Autuacaoes() {
   const [modelo, setModelo] = useState("");
   const [tipo, setTipo] = useState("");
   const [especie, setEspecie] = useState("");
-  const [imagens, setImagens] = useState("");
+  const [imagens, setImagens] = useState<string[]>([]);
 
   // Dados da Infração
   const [local, setlocal] = useState("");
@@ -280,8 +289,10 @@ export default function Autuacaoes() {
   // Modal
   const [modal, setModal] = useState(MODAL.NONE);
 
+  // Recebe a lista de códigos
   const [codigo, setCodigo] = useState<ListCod[]>(DATA);
   const [selecText, setSelecText] = useState<ListCod[]>(DATA);
+
   // filtra a pesquisa do usuário
   function filter(text: string) {
     if (text) {
@@ -299,6 +310,7 @@ export default function Autuacaoes() {
     }
   }
 
+  // Função para preparar o componente RadioButton
   const radioButtons: RadioButtonProps[] = useMemo(
     () => [
       {
@@ -320,12 +332,73 @@ export default function Autuacaoes() {
     []
   );
 
+  // Função recebe o código da infração selecionada
   function onSelectData(item: ListCod) {
     setInfracaoSelecionada(item);
     setTextCod(item.codigo);
     setSelecText(codigo);
     setModal(MODAL.NONE);
   }
+
+  // Função para ter acesso a galeria de imagens
+  const askPermission = async (failureMessage: string) => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (status === "denied") {
+      alert(failureMessage);
+    }
+  };
+
+  // Funação para ter acesso a camera
+  const askCameraPermission = async (failureMessage: string) => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status === "denied") {
+      alert(failureMessage);
+    }
+  };
+
+  // Função para tirar foto
+  const takePhoto = async () => {
+    await askCameraPermission(
+      "Precisamos da permissão da câmera para tirar uma foto..."
+    );
+    let pickerResult = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [2, 1],
+    });
+    console.log(pickerResult);
+
+    if (pickerResult.canceled) return;
+
+    setImagens([...imagens, pickerResult.assets[0].uri]);
+
+    // handleImagePicked(pickerResult);
+  };
+
+  // Função para selecinar imagem da galeria
+  const pickImage = async () => {
+    await askPermission(
+      "Precisamos da permissão do rolo da câmera para ler as fotos do seu telefone..."
+    );
+
+    let pickerResult = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [2, 1],
+    });
+    console.log(pickerResult);
+
+    if (pickerResult.canceled) return;
+
+    setImagens([...imagens, pickerResult.assets[0].uri]);
+  };
+
+  // Função para remover imagem
+  const removerImagem = (img: any) => {
+    setImagens((l) => l.filter((item) => item !== img));
+    
+    if (imagens.length <= 1) setModal(MODAL.NONE)  
+  };
+
   return (
     <View>
       {/* Cabeçalho */}
@@ -391,9 +464,27 @@ export default function Autuacaoes() {
           </View>
 
           {/* Imagens do Veiculo */}
-          <Button variant="primary">
-            <Button.TextButton title="Adicionar Imagens" />
-          </Button>
+          <View className="flex flex-row justify-between mb-4">
+            <View className="flex-1 mr-2">
+              <Button variant="primary" onPress={() => takePhoto()}>
+                <Button.TextButton title="Tirar foto" />
+              </Button>
+            </View>
+            <View className="flex-1 ml-2">
+              <Button variant="primary" onPress={() => pickImage()}>
+                <Button.TextButton title="Abrir galeria" />
+              </Button>
+            </View>
+          </View>
+
+          {/* Se houver imagem */}
+          {imagens.length ? (
+            <Button variant="primary" onPress={() => setModal(MODAL.IMAGENS)}>
+        <Button.TextButton title={`Imagens(${imagens.length})`} />
+            </Button>
+          ) : (
+            <></>
+          )}
 
           {/* Dados da Infração */}
           <View className="flex">
@@ -409,39 +500,9 @@ export default function Autuacaoes() {
                 <Field placeholder="Hora" variant="primary" />
               </View>
             </View>
-            <Button variant="primary">
-              <Button.TextButton
-                title="Código da Infração"
-                onPress={() => setModal(MODAL.MODAL)}
-              />
+            <Button variant="primary" onPress={() => setModal(MODAL.INFRACAO)}>
+              <Button.TextButton title="Código da Infração" />
             </Button>
-            <Modal
-              variant="primary"
-              visible={modal === MODAL.MODAL}
-              onClose={() => setModal(MODAL.NONE)}
-            >
-              <Field
-                className="mb-4"
-                placeholder="Código da Infração"
-                variant="primary"
-                onChangeText={(text) => filter(text)}
-              />
-              <FlatList
-                data={selecText}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    className="bg-gray-300 rounded-md p-2 my-4"
-                    onPress={() => onSelectData(item)}
-                  >
-                    <Text className="text-lg font-medium">{item.codigo}</Text>
-                  </TouchableOpacity>
-                )}
-                horizontal={false}
-                scrollEnabled={true}
-                showsVerticalScrollIndicator={false}
-                keyExtractor={(item) => item.id}
-              />
-            </Modal>
             {textCod ? (
               <View className="bg-gray-300 rounded-md px-2 py-4 mt-4">
                 <Text className="font-medium text-lg">{textCod}</Text>
@@ -474,6 +535,59 @@ export default function Autuacaoes() {
           </Button>
         </View>
       </ScrollView>
+      <Modal
+        className="bg-gray-200"
+        variant="primary"
+        visible={modal === MODAL.IMAGENS}
+        onClose={() => setModal(MODAL.NONE)}
+      >
+        <View className="flex-1">
+          <FlatList
+            data={imagens}
+            renderItem={({ item }) => (
+              <View className="w-full mb-4 bg-white p-2 rounded-md border-gray-300 border-2">
+                <Image className="h-56 rounded-md" source={{ uri: item }} />
+                <Pressable
+                  className="py-4 items-center"
+                  onPress={() => removerImagem(item)}
+                >
+                  <Text className="text-red-500 font-semiBold text-lg">
+                    Excluir
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+            showsVerticalScrollIndicator={false}
+          />
+        </View>
+      </Modal>
+      <Modal
+        variant="primary"
+        visible={modal === MODAL.INFRACAO}
+        onClose={() => setModal(MODAL.NONE)}
+      >
+        <Field
+          className="mb-4"
+          placeholder="Código da Infração"
+          variant="primary"
+          onChangeText={(text) => filter(text)}
+        />
+        <FlatList
+          data={selecText}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              className="bg-gray-300 rounded-md p-2 my-4"
+              onPress={() => onSelectData(item)}
+            >
+              <Text className="text-lg font-medium">{item.codigo}</Text>
+            </TouchableOpacity>
+          )}
+          horizontal={false}
+          scrollEnabled={true}
+          showsVerticalScrollIndicator={false}
+          keyExtractor={(item) => item.id}
+        />
+      </Modal>
     </View>
   );
 }

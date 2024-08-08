@@ -34,7 +34,13 @@
       "typedRoutes": true
     },
     "plugins": [
-      "expo-router"
+      ["expo-router"],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O aplicativo acessa suas fotos para que você possa compartilhá-las."
+        }
+      ]
     ]
   }
 }
