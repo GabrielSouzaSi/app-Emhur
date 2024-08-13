@@ -12,8 +12,8 @@ export default function MenuVistoria() {
         variant="primary"
       />
       <View className="flex p-4">
-        <MenuCardSmall onPress={() => router.push("/(fiscal)/vistoria")} title="Cadastrar" variant="primary" />
-        <MenuCardSmall onPress={() => router.push("/(fiscal)/consultarVistoria")} title="Consultar" variant="primary" />
+        <MenuCardSmall onPress={() => router.push("/vistoria")} title="Cadastrar" variant="primary" />
+        <MenuCardSmall onPress={() => router.push("/consultarVistoria")} title="Consultar" variant="primary" />
       </View>
     </View>
   );

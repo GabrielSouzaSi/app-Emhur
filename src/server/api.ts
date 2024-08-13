@@ -1,5 +1,13 @@
 import axios from "axios";
 
-export const api = axios.create({
-    baseURL: "https://appbus.conexo.solutions/api/"
+const api = axios.create({
+    baseURL: "http://192.168.100.169:3333"
 });
+
+api.interceptors.request.use((response) => {
+    return response;
+}, (error) => {
+    return Promise.reject(error);
+})
+
+export { api }

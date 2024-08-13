@@ -1,7 +1,10 @@
 import "@/styles/global.css";
-import { Slot, Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { StatusBar, View } from "react-native";
 import React, { useEffect } from "react";
+import * as SplashScreen from "expo-splash-screen";
+import Constants from "expo-constants";
+
 import {
   useFonts,
   Montserrat_400Regular,
@@ -9,17 +12,18 @@ import {
   Montserrat_600SemiBold,
   Montserrat_700Bold,
 } from "@expo-google-fonts/montserrat";
-import * as SplashScreen from "expo-splash-screen";
-import Constants from 'expo-constants'
 
-import { Loading } from "@components/loading";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { AuthContextProvider } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/useAuth";
+import { Loading } from "@/components/loading";
 
 SplashScreen.preventAutoHideAsync();
-
 const statusBarHeight = Constants.statusBarHeight;
 
-export default function Layout() {
+function StackLayout() {
+  const { user, isLoadingUserStorageData } = useAuth();
+  const router = useRouter();
+
   const [isFontLoaded] = useFonts({
     Montserrat_400Regular,
     Montserrat_500Medium,
@@ -28,29 +32,42 @@ export default function Layout() {
   });
 
   useEffect(() => {
-    async function prepare() {
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        SplashScreen.hideAsync();
-      } catch (e) {
-        console.warn(e);
+    console.log("authState", user);
+
+    if (isFontLoaded) {
+      if (!user?.id) {
+        console.log("===Login===");
+        router.replace("/");
+      } else if (user?.id) {
+        console.log("===Fiscal===");
+        router.replace("/(fiscal)");
       }
+    } else {
+      return;
     }
-    prepare();
-  }, []);
-  if (!isFontLoaded) {
-    return <Loading />;
-  }
+  }, [user, isFontLoaded]);
+
+  setTimeout(() => {
+    SplashScreen.hideAsync();
+  }, 2000);
 
   return (
-    <View className="flex-1" style={{ marginTop: statusBarHeight}}>
+    <View className="flex-1" style={{ marginTop: statusBarHeight }}>
       <StatusBar barStyle="dark-content" />
-      <Slot />
+      {isFontLoaded ? (<Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(fiscal)" />
+      </Stack>):(<Loading />)}
     </View>
-      // <Stack screenOptions={{headerShown: false}}>
-      //   <Stack.Screen name="index" />
-      //   <Stack.Screen name="(fiscal)" />   
-      //   <Stack.Screen name="(fiscal)/index" />   
-      // </Stack>
   );
 }
+
+const RootLayoutNav = () => {
+  return (
+    <AuthContextProvider>
+      <StackLayout />
+    </AuthContextProvider>
+  );
+};
+
+export default RootLayoutNav;

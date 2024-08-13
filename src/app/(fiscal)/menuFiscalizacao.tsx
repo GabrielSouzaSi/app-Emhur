@@ -10,22 +10,22 @@ export default function MenuFiscalizacao() {
       <HeaderBack title="Fiscal" variant="primary" />
       <View className="flex p-4">
         <MenuCardSmall
-          onPress={() => router.push("/(fiscal)/credencial")}
+          onPress={() => router.push("/credencial")}
           title="Credencial"
           variant="primary"
         />
         <MenuCardSmall
-          onPress={() => router.push("/(fiscal)/autuacoes")}
+          onPress={() => router.push("/autuacoes")}
           title="Autuações"
           variant="primary"
         />
         <MenuCardSmall
-          onPress={() => router.push("/(fiscal)/consultarAutuacao")}
+          onPress={() => router.push("/consultarAutuacao")}
           title="Consultar"
           variant="primary"
         />
         <MenuCardSmall
-          onPress={() => router.push("/(fiscal)/escala")}
+          onPress={() => router.push("/escala")}
           title="Escala"
           variant="primary"
         />

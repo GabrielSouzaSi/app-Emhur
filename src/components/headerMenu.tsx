@@ -5,16 +5,18 @@ import {
   TouchableOpacityProps,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+
 import styles from "@/styles/shadow";
 
 type Variants = "primary"|"secundary"
 
 type Props = TouchableOpacityProps & {
+  onLogout: () => void;
   variant?: Variants;
 }
 
-export function HeaderMenu({variant="secundary", ...rest }: Props) {
+export function HeaderMenu({variant="secundary", onLogout, ...rest }: Props) {
   const router = useRouter();
   return (
     <View
@@ -24,8 +26,8 @@ export function HeaderMenu({variant="secundary", ...rest }: Props) {
     >
       <Image className="w-10 h-12" source={require("@assets/emhurMenu.png")} />
       <Image className="w-12 h-12" source={require("@assets/prefeituraMenu.png")} />
-      <TouchableOpacity onPress={() => router.back()}>
-        <MaterialIcons name="logout" size={30} color={variant === "primary"? "#008dd0":"#0da63e"} />
+      <TouchableOpacity onPress={() => onLogout()}>
+        <MaterialCommunityIcons name="logout" size={30} color={variant === "primary"? "#008dd0":"#0da63e"} />
       </TouchableOpacity>
     </View>
   );
