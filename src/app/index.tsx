@@ -5,7 +5,7 @@ import { useForm, Controller } from "react-hook-form";
 
 import { useAuth } from "@/hooks/useAuth";
 
-import { Header } from "@components/header";
+import { Header } from "@/components/header";
 import { Field } from "@/components/input";
 import { Button } from "@/components/button";
 import { Loading } from "@/components/loading";
@@ -50,8 +50,8 @@ export default function Login() {
 
       <View className="p-8">
         <View className="items-center mb-10">
-          <Image className="mb-5" source={require("@assets/prefeitura.png")} />
-          <Image source={require("@assets/emhur.png")} />
+          <Image className="mb-5" source={require("@/assets/prefeitura.png")} />
+          <Image source={require("@/assets/emhur.png")} />
         </View>
 
         <View>
@@ -88,6 +88,7 @@ export default function Login() {
               <Field
                 className={`mt-5 ${!!errors.password ? "border-red-500" : ""}`}
                 placeholder="Senha"
+                secureTextEntry
                 textContentType="password"
                 onChangeText={onChange}
                 onSubmitEditing={handleSubmit(handleSignIn)}

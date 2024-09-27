@@ -1,8 +1,7 @@
 import { View } from "react-native";
 import { useRouter } from "expo-router";
-import { HeaderMenu } from "@components/headerMenu";
-import { MenuCard } from "@components/menuCard";
-import { Button } from "@/components/button";
+import { HeaderMenu } from "@/components/headerMenu";
+import { MenuCard } from "@/components/menuCard";
 import { useAuth } from "@/hooks/useAuth";
 
 

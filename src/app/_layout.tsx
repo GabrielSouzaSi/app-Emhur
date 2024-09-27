@@ -4,6 +4,12 @@ import { StatusBar, View } from "react-native";
 import React, { useEffect } from "react";
 import * as SplashScreen from "expo-splash-screen";
 import Constants from "expo-constants";
+// Database
+import { drizzle } from "drizzle-orm/expo-sqlite";
+import { openDatabaseSync, SQLiteProvider } from "expo-sqlite";
+import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
+
+import migrations from "@drizzle/migrations";
 
 import {
   useFonts,
@@ -20,7 +26,13 @@ import { Loading } from "@/components/loading";
 SplashScreen.preventAutoHideAsync();
 const statusBarHeight = Constants.statusBarHeight;
 
+const DATABASE_NAME = "databese.db";
+
+const expoDb = openDatabaseSync(DATABASE_NAME);
+const db = drizzle(expoDb);
+
 function StackLayout() {
+  const { success, error } = useMigrations(db, migrations);
   const { user, isLoadingUserStorageData } = useAuth();
   const router = useRouter();
 
@@ -31,10 +43,14 @@ function StackLayout() {
     Montserrat_700Bold,
   });
 
+  // console.log("success", success);
+  console.log("Error => ", error);
+  
+
   useEffect(() => {
     console.log("authState", user);
 
-    if (isFontLoaded) {
+    if (isFontLoaded && success) {
       if (!user?.id) {
         console.log("===Login===");
         router.replace("/");
@@ -45,7 +61,7 @@ function StackLayout() {
     } else {
       return;
     }
-  }, [user, isFontLoaded]);
+  }, [user, isFontLoaded, success]);
 
   setTimeout(() => {
     SplashScreen.hideAsync();
@@ -54,10 +70,14 @@ function StackLayout() {
   return (
     <View className="flex-1" style={{ marginTop: statusBarHeight }}>
       <StatusBar barStyle="dark-content" />
-      {isFontLoaded ? (<Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="(fiscal)" />
-      </Stack>):(<Loading />)}
+      {isFontLoaded ? (
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="(fiscal)" />
+        </Stack>
+      ) : (
+        <Loading />
+      )}
     </View>
   );
 }
@@ -65,7 +85,9 @@ function StackLayout() {
 const RootLayoutNav = () => {
   return (
     <AuthContextProvider>
+      <SQLiteProvider databaseName={DATABASE_NAME} >
       <StackLayout />
+      </SQLiteProvider>
     </AuthContextProvider>
   );
 };

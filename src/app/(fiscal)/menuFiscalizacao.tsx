@@ -15,7 +15,7 @@ export default function MenuFiscalizacao() {
           variant="primary"
         />
         <MenuCardSmall
-          onPress={() => router.push("/autuacoes")}
+          onPress={() => router.push("/historicoAutuacoes")}
           title="Autuações"
           variant="primary"
         />

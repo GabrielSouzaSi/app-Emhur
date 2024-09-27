@@ -1,6 +1,6 @@
 import { View } from "react-native";
-import { HeaderMenu } from "@components/headerMenu";
-import { MenuCard } from "@components/menuCard";
+import { HeaderMenu } from "@/components/headerMenu";
+import { MenuCard } from "@/components/menuCard";
 import { useRouter } from "expo-router";
 
 export default function Permissionario() {
@@ -8,7 +8,7 @@ export default function Permissionario() {
 
   return (
     <>
-        <HeaderMenu/>
+        <HeaderMenu onLogout={() => {}}/>
         <View className="mt-4 flex flex-row justify-between px-5">
         <MenuCard onPress={() => router.push("/(permissionario)/alvara")} title="Alvará" icon="file-check-outline"/>
         <MenuCard onPress={() => router.push("/(permissionario)/menuServicos")} title="Serviços" icon="view-grid-outline"/>

@@ -6,10 +6,12 @@ const FiscalLayout = () => {
 		<Stack screenOptions={{ headerShown: false }}>
 		  <Stack.Screen name="index" />
 		  <Stack.Screen name="autuacoes" />
+		  <Stack.Screen name="[id]" />
 		  <Stack.Screen name="consultarAutuacao" />
 		  <Stack.Screen name="consultarVistoria" />
 		  <Stack.Screen name="credencial" />
 		  <Stack.Screen name="escala" />
+		  <Stack.Screen name="historicoAutuacoes" />
 		  <Stack.Screen name="menuFiscalizacao" />
 		  <Stack.Screen name="menuVistoria" />
 		  <Stack.Screen name="veiculo" />

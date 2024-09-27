@@ -1,22 +1,15 @@
-import { MenuCardSmall } from "@/components/menuCard";
 import { useCallback, useState } from "react";
 import { useEffect } from "react";
 import { Alert, View } from "react-native";
-import { useSQLiteContext } from "expo-sqlite";
-import { drizzle } from "drizzle-orm/expo-sqlite";
-import * as autuacaoSchema from "@/database/schemas/autuacaoSchema";
-import * as infracaoSchema from "@/database/schemas/infracaoSchema";
 import { HeaderBack } from "@/components/headerBack";
-import { integer, sqliteTable } from "drizzle-orm/sqlite-core";
 import { Button } from "@/components/button";
 import { useRouter, useFocusEffect } from "expo-router";
 import DataTable from "@/components/dataTable";
 import { useAuth } from "@/hooks/useAuth";
 import { server } from "@/server/api";
 import { Loading } from "@/components/loading";
-import { string } from "yup";
 
-export default function MenuVistoria() {
+export default function HistoricoAutuacoes() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const { user } = useAuth();
@@ -34,10 +27,12 @@ export default function MenuVistoria() {
   async function getViolations() {
     try {
       setIsLoaded(true);
-      const { data } = await server.get(`/agent/${user.id}/violations`);
+      const { data } = await server.get(`/permit-holder/${user.id}/violations`);
 
       setViolations(data.violations);
     } catch (error) {
+      console.log(error);
+      
       throw error;
     } finally {
       setIsLoaded(false);
@@ -51,7 +46,7 @@ export default function MenuVistoria() {
       return () => clearInterval(intervalId);
     }
   }, [isFocused]);
-  useFocusEffect(
+  useFocusEffect( 
     useCallback(() => {
       setIsFocused(true);// Está focado.
 
@@ -62,15 +57,11 @@ export default function MenuVistoria() {
   );
   return (
     <View className="flex-1">
-      <HeaderBack title="Histórico de Vistoria" variant="primary" />
+      <HeaderBack title="Histórico de Autuações" />
 
       {violations ? <DataTable data={violations} onEdit={handleEdit} /> : <></>}
 
-      <View className="mx-4">
-        <Button variant="primary" onPress={() => router.push("/vistoria")}>
-          <Button.TextButton title="Cadastrar Vistoria" />
-        </Button>
-      </View>
+      
       {isLoaded ? <Loading /> : <></>}
     </View>
   );

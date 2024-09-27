@@ -6,33 +6,14 @@
       "@/*": [
         "./src/*"
       ],
-      "@dtos/*": [
-        "./src/dtos/*"
-      ],
-      "@assets/*": [
-        "./src/assets/*"
-      ],
-      "@components/*": [
-        "./src/components/*"
-      ],
-      "@storage/*": [
-        "./src/storage/*"
-      ],
-      "@utils/*": [
-        "./src/utils/*"
-      ],
-      "@services/*": [
-        "./src/services/*"
-      ],
-      "@hooks/*": [
-        "./src/hooks/*"
-      ],
-      "@contexts/*": [
-        "./src/contexts/*"
+      "@drizzle/*": [
+        "./drizzle/*"
       ]
     }
   },
   "include": [
+    "**/*.js",
+    "drizzle/migrations.js",
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",

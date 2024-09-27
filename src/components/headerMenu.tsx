@@ -24,8 +24,8 @@ export function HeaderMenu({variant="secundary", onLogout, ...rest }: Props) {
       style={styles.shadow}
       {...rest}
     >
-      <Image className="w-10 h-12" source={require("@assets/emhurMenu.png")} />
-      <Image className="w-12 h-12" source={require("@assets/prefeituraMenu.png")} />
+      <Image className="w-10 h-12" source={require("@/assets/emhurMenu.png")} />
+      <Image className="w-12 h-12" source={require("@/assets/prefeituraMenu.png")} />
       <TouchableOpacity onPress={() => onLogout()}>
         <MaterialCommunityIcons name="logout" size={30} color={variant === "primary"? "#008dd0":"#0da63e"} />
       </TouchableOpacity>

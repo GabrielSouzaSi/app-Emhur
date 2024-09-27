@@ -72,5 +72,32 @@ const MenuCardSmall = forwardRef<TouchableOpacity, Props>(
     );
   }
 );
+const SubMenuCardSmall = forwardRef<TouchableOpacity, Props>(
+  ({ title, variant = "secundary", className, ...rest }, ref) => {
+    return (
+      <TouchableOpacity
+        ref={ref}
+        className={clsx(
+          "w-full bg-white my-2 py-2 border-l-2 justify-center pl-2",
+          { "border-blue-500": variant === "primary" },
+          { "border-green-500": variant === "secundary" },
+          className
+        )}
+        style={{ elevation: 2 }}
+        {...rest}
+      >
+        <Text
+          className={clsx(
+            "font-semiBold font-bold text-base",
+            { "text-blue-500": variant == "primary" },
+            { "text-green-500": variant == "secundary" }
+          )}
+        >
+          {title}
+        </Text>
+      </TouchableOpacity>
+    );
+  }
+);
 
-export { MenuCard, MenuCardSmall };
+export { MenuCard, MenuCardSmall, SubMenuCardSmall };

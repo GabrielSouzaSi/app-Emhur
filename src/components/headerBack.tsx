@@ -5,7 +5,7 @@ import {
   TouchableOpacityProps,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { ArrowLeft } from "phosphor-react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import clsx from "clsx";
 import colors from "tailwindcss/colors";
 import styles from "@/styles/shadow";
@@ -35,7 +35,7 @@ export function HeaderBack({
           className
         )}
       >
-        <ArrowLeft size={30} color={colors.white} />
+        <MaterialCommunityIcons name="arrow-left" size={30} color={colors.white} />
       </TouchableOpacity>
 
       <View className="flex w-full items-center justify-center absolute py-4">
