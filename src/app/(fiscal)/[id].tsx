@@ -16,6 +16,7 @@ import { Loading } from "@/components/loading";
 import { VehicleDTO } from "@/dtos/vehicleDTO";
 import { PermitHolderDTO } from "@/dtos/permitHolderDTO";
 import { server } from "@/server/api";
+import { string } from "yup";
 
 type ListCod = {
   id: number;
@@ -26,14 +27,22 @@ export default function IdAutuacao() {
   const { id } = useLocalSearchParams();
   const [isLoaded, setIsLoaded] = useState(false);
   const [vehicle, setVehicle] = useState<VehicleDTO>();
+  const [approach, setApproach] = useState("");
+  const [description, setDescription] = useState("");
+  const [code, setCode] = useState("");
   const [permitHolder, setPermitHolder] = useState<PermitHolderDTO>();
 
   async function getViolationCode() {
     try {
       setIsLoaded(true);
-      const { data } = await server.get(`/violations/show/${id}`);
-      console.log(data);
-      
+      const { data } = await server.get(`/violation/show/${id}`);
+      const { vehicle_id, violation } = data;
+
+      setApproach(data.violation.approach.name);
+      setCode(`${data.violation.violation_code.code}:${data.violation.violation_code.description}`);
+      setDescription(data.violation.description);
+      setVehicle(vehicle_id);
+      setPermitHolder(data.violation.permit_holder);
     } catch (error) {
       throw error;
     } finally {
@@ -43,7 +52,7 @@ export default function IdAutuacao() {
 
   useEffect(() => {
     getViolationCode();
-  },[]);
+  }, []);
   return (
     <View>
       {/* Cabeçalho */}
@@ -69,7 +78,7 @@ export default function IdAutuacao() {
                   </Text>
                   <View className="bg-gray-300 rounded-md p-3">
                     <Text className="font-semiBold text-lg">
-                      vehicle.plate_number
+                      {vehicle?.plate_number}
                     </Text>
                   </View>
                 </View>
@@ -78,7 +87,9 @@ export default function IdAutuacao() {
                     Marca:
                   </Text>
                   <View className="bg-gray-300 rounded-md p-3">
-                    <Text className="font-semiBold text-lg">vehicle.make</Text>
+                    <Text className="font-semiBold text-lg">
+                      {vehicle?.make}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -89,7 +100,9 @@ export default function IdAutuacao() {
                     Modelo:
                   </Text>
                   <View className="bg-gray-300 rounded-md p-3">
-                    <Text className="font-semiBold text-lg">vehicle.model</Text>
+                    <Text className="font-semiBold text-lg">
+                      {vehicle?.model}
+                    </Text>
                   </View>
                 </View>
                 <View className="flex-1">
@@ -97,7 +110,9 @@ export default function IdAutuacao() {
                     Cor:
                   </Text>
                   <View className="bg-gray-300 rounded-md p-3">
-                    <Text className="font-semiBold text-lg">vehicle.color</Text>
+                    <Text className="font-semiBold text-lg">
+                      {vehicle?.color}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -108,7 +123,9 @@ export default function IdAutuacao() {
                     Ano:
                   </Text>
                   <View className="bg-gray-300 rounded-md p-3">
-                    <Text className="font-semiBold text-lg">vehicle.year</Text>
+                    <Text className="font-semiBold text-lg">
+                      {vehicle?.year}
+                    </Text>
                   </View>
                 </View>
                 <View className="flex-1">
@@ -117,7 +134,7 @@ export default function IdAutuacao() {
                   </Text>
                   <View className="bg-gray-300 rounded-md p-3">
                     <Text className="font-semiBold text-lg">
-                      vehicle.renavam
+                      {vehicle?.renavam.slice(0, 3)}*****
                     </Text>
                   </View>
                 </View>
@@ -138,7 +155,7 @@ export default function IdAutuacao() {
                   </Text>
                   <View className="bg-gray-300 rounded-md p-3">
                     <Text className="font-semiBold text-lg">
-                      permitHolder.name
+                      {permitHolder?.name}
                     </Text>
                   </View>
                 </View>
@@ -151,7 +168,7 @@ export default function IdAutuacao() {
                   </Text>
                   <View className="bg-gray-300 rounded-md p-3">
                     <Text className="font-semiBold text-lg">
-                      permitHolder.cpf
+                      {permitHolder?.cpf.slice(0, 3)}*****
                     </Text>
                   </View>
                 </View>
@@ -161,7 +178,7 @@ export default function IdAutuacao() {
                   </Text>
                   <View className="bg-gray-300 rounded-md p-3">
                     <Text className="font-semiBold text-lg">
-                      permitHolder.cnh
+                      {permitHolder?.cnh.slice(0, 3)}*****
                     </Text>
                   </View>
                 </View>
@@ -170,10 +187,13 @@ export default function IdAutuacao() {
           </View>
 
           {/* Modo de abordagem */}
-          <View className="mb-6">
+          <View className="">
             <Text className="mb-4 text-gray-500 font-regular text-2xl font-bold">
               Modo de abordagem:
             </Text>
+            <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
+              <Text className="font-semiBold text-lg">{approach}</Text>
+            </View>
           </View>
 
           {/* Dados da Infração */}
@@ -182,8 +202,8 @@ export default function IdAutuacao() {
               Dados da Infração:
             </Text>
 
-            <View className="bg-gray-300 rounded-md px-2 py-4 mt-4">
-              <Text className="font-medium text-lg">cod</Text>
+            <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
+              <Text className="font-semiBold text-lg">{code}</Text>
             </View>
           </View>
 
@@ -192,8 +212,8 @@ export default function IdAutuacao() {
             <Text className="my-4 text-gray-500 font-regular text-2xl font-bold">
               Observação:
             </Text>
-            <View className="bg-gray-300 rounded-md px-2 py-4 mt-4">
-              <Text className="font-medium text-lg">text</Text>
+            <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
+              <Text className="font-semiBold text-lg">{description}</Text>
             </View>
           </View>
         </View>
