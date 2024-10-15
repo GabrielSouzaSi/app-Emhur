@@ -112,24 +112,6 @@ export default function Login() {
         <Button variant="primary" onPress={handleSubmit(handleSignIn)}>
           <Button.TextButton title="Entrar" />
         </Button>
-
-        <View className="mt-7 items-center">
-          <Link
-            href={"/(fiscal)"}
-            className="mb-5 font-regular font-bold text-base text-green-500"
-          >
-            Ambiante do Fiscal
-          </Link>
-
-          <Pressable
-            className="mb-3"
-            onPress={() => router.push("/(permissionario)")}
-          >
-            <Text className="font-regular font-bold text-base text-green-500">
-              Ambiente do Permissionário
-            </Text>
-          </Pressable>
-        </View>
         {isLoading && <Loading />}
       </View>
     </>

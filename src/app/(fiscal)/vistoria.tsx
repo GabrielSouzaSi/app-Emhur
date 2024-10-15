@@ -26,6 +26,7 @@ import { InspectionItemDTO } from "@/dtos/inspectionItemDTO";
 import { Modal } from "@/components/modal";
 import axios from "axios";
 import { string } from "yup";
+import { json } from "drizzle-orm/mysql-core";
 
 enum MODAL {
   NONE = 0,
@@ -187,7 +188,7 @@ export default function Vistoria() {
     console.log(formattedData);
     
 
-    setFormData(result);
+    setFormData(formattedData);
   }
 
   // Função para ter acesso a galeria de imagens
@@ -321,7 +322,7 @@ export default function Vistoria() {
     data.append("inspection_time", `${time}`);
     data.append("advertising", `${advertising}`);
     data.append("final_observations", `${obs}`);
-    data.append("inspection_items", formData);
+    data.append("inspection_items", JSON.stringify(formData));
     data.append("inspection_result", "");
     imagens.forEach((image: any, index: number) => {
       data.append("attachments[]", {

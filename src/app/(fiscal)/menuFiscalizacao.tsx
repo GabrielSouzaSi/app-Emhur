@@ -20,11 +20,6 @@ export default function MenuFiscalizacao() {
           variant="primary"
         />
         <MenuCardSmall
-          onPress={() => router.push("/consultarAutuacao")}
-          title="Consultar"
-          variant="primary"
-        />
-        <MenuCardSmall
           onPress={() => router.push("/escala")}
           title="Escala"
           variant="primary"

@@ -28,6 +28,7 @@ import RadioButtonGroup from "@/components/radioButtonGroup";
 import { useAuth } from "@/hooks/useAuth";
 import { VehicleDTO } from "@/dtos/vehicleDTO";
 import { PermitHolderDTO } from "@/dtos/permitHolderDTO";
+import { DropdownButton } from "@/components/buttonDropdown";
 
 enum MODAL {
   NONE = 0,
@@ -57,7 +58,7 @@ export default function Autuacaoes() {
   const router = useRouter();
 
   // Mode de Abordagem
-  const [approach, setApproach] = useState<Option[]>([]);
+  const [approach, setApproach] = useState([]);
   const [abordagem, setAbordagem] = useState<number>();
 
   // Informações do Veiculo
@@ -104,7 +105,13 @@ export default function Autuacaoes() {
       setIsLoaded(true);
       const { data } = await server.get(`/vehicle/1`);
       const { approach } = data;
-      setApproach(approach);
+      let optionApproach = approach.map((data: any) => {
+        return {
+          label: data.name,
+          value: data.id,
+        };
+      });
+      setApproach(optionApproach);
       const { violationCode } = data;
       let cod = await violationCode.map((item: any) => {
         return {
@@ -163,6 +170,7 @@ export default function Autuacaoes() {
       await server.postForm(`/violations`, formData);
       Alert.alert("Sucesso", "Autuação enviado com sucesso!");
     } catch (error) {
+      Alert.alert("Algo deu errado!", "Tente novamente!");
       console.log(error);
     } finally {
       setIsLoaded(false);
@@ -210,9 +218,9 @@ export default function Autuacaoes() {
   }
 
   // Função para preparar o componente RadioButton
-  const handleRadioButtonChange = (selectedId: number) => {
-    setAbordagem(selectedId);
-    console.log("Selected Option ID:", selectedId);
+  const onSelectMode = (item: any) => {
+    setAbordagem(item.value);
+    console.log("Selected Option ID:", item.value);
   };
 
   // Função recebe o código da infração selecionada
@@ -414,7 +422,7 @@ export default function Autuacaoes() {
                     </Text>
                     <View className="bg-gray-300 rounded-md p-3">
                       <Text className="font-semiBold text-lg">
-                        {vehicle.renavam.slice(0,3)}*****
+                        {vehicle.renavam.slice(0, 3)}*****
                       </Text>
                     </View>
                   </View>
@@ -452,7 +460,7 @@ export default function Autuacaoes() {
                     </Text>
                     <View className="bg-gray-300 rounded-md p-3">
                       <Text className="font-semiBold text-lg">
-                        {permitHolder.cpf.slice(0,3)}*****
+                        {permitHolder.cpf.slice(0, 3)}*****
                       </Text>
                     </View>
                   </View>
@@ -462,7 +470,7 @@ export default function Autuacaoes() {
                     </Text>
                     <View className="bg-gray-300 rounded-md p-3">
                       <Text className="font-semiBold text-lg">
-                        {permitHolder.cnh.slice(0,3)}*****
+                        {permitHolder.cnh.slice(0, 3)}*****
                       </Text>
                     </View>
                   </View>
@@ -474,19 +482,18 @@ export default function Autuacaoes() {
           )}
 
           {/* Modo de abordagem */}
-          <View className="mb-6">
-            <Text className="mb-4 text-gray-500 font-regular text-2xl font-bold">
-              Modo de abordagem:
-            </Text>
-            {approach.length ? (
-              <RadioButtonGroup
-                options={approach}
-                onValueChange={handleRadioButtonChange}
+          {approach.length ? (
+            <>
+              <Text className="mb-4 text-gray-500 font-regular text-2xl font-bold">
+                Modo de abordagem:
+              </Text>
+              <DropdownButton
+                data={approach}
+                onSelect={onSelectMode}
+                placeholder="Modo de abordagem"
               />
-            ) : (
-              <></>
-            )}
-          </View>
+            </>
+          ): (<></>)}
 
           {/* Imagens do Veiculo */}
           <View className="flex flex-row justify-between mb-4">
