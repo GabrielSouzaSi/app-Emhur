@@ -11,6 +11,8 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
 
+import { useAuth } from "@/hooks/useAuth";
+
 import { HeaderBack } from "@/components/headerBack";
 import { Field } from "@/components/input";
 import { Button } from "@/components/button";
@@ -22,6 +24,8 @@ import { VehicleDTO } from "@/dtos/vehicleDTO";
 import { PermitHolderDTO } from "@/dtos/permitHolderDTO";
 import { InspectionItemDTO } from "@/dtos/inspectionItemDTO";
 import { Modal } from "@/components/modal";
+import axios from "axios";
+import { string } from "yup";
 
 enum MODAL {
   NONE = 0,
@@ -38,6 +42,8 @@ type Locations = {
 export default function Vistoria() {
   const [isLoaded, setIsLoaded] = useState(false);
 
+  const { user } = useAuth();
+
   // Informações do Veiculo
   const [vehicle, setVehicle] = useState<VehicleDTO>();
   const [numero, setNumero] = useState("");
@@ -45,18 +51,19 @@ export default function Vistoria() {
   const [permitHolder, setPermitHolder] = useState<PermitHolderDTO>();
   // Motivos da vistoria
   const [inspectionOptions, setInspectionOptions] = useState([]);
+  const [inspectionReason, setInspectionReason] = useState<number>();
   // Formulário da vistoria
-  const [formData, setFormData] = useState();
+  const [formData, setFormData] = useState<any>();
   // Locais
   const [listLocations, setListLocations] = useState([]);
   const [locations, setLocations] = useState<any>();
+  // Propaganda
+  const [advertising, setAdvertising] = useState("");
   // Obserções
   const [obs, setObs] = useState("");
 
   // Itens da vitoria
   const [inspectionItems, setInspectionItems] = useState<InspectionItemDTO[]>();
-  const [inspectionItemsForm, setInspectionItemsForm] =
-    useState<InspectionItemDTO[]>();
 
   // Imagens
   const [imagens, setImagens] = useState<ImagePicker.ImagePickerResult[] | any>(
@@ -114,6 +121,7 @@ export default function Vistoria() {
   }
   // Função para listar os itens da vistoria
   async function inspectionReasonsItems(id: number) {
+    setInspectionReason(id);
     try {
       const { data } = await server.get(`inspection-reasons/${id}/items`);
       let result = await data.map((data: InspectionItemDTO) => {
@@ -127,7 +135,6 @@ export default function Vistoria() {
         };
       });
       setInspectionItems(result);
-      setInspectionItemsForm(result);
     } catch (error) {
       console.log(error);
     }
@@ -146,14 +153,41 @@ export default function Vistoria() {
 
   // Função recebe os dados do item da vistoria
   function onInspectionItem(item: InspectionItemDTO) {
-    let result = inspectionItemsForm?.map((data) => {
+    const result = inspectionItems?.map((data) => {
       if (data.id == item.id) {
-        return item;
+        return {
+          [item.id]: {
+            exists: item.exists,
+            additional_info: item.info,
+            status: item.status,
+          },
+        };
       } else {
-        return data;
+        return {
+          [data.id]: {
+            exists: data.exists,
+            additional_info: data.info,
+            status: data.status,
+          },
+        };
       }
     });
     console.log(result);
+
+    const formattedData = result.reduce((acc, currentItem) => {
+      const [key, value] = Object.entries(currentItem)[0];
+
+      acc[key] = {
+        ...value
+      };
+
+      return acc;
+    }, {});
+
+    console.log(formattedData);
+    
+
+    setFormData(result);
   }
 
   // Função para ter acesso a galeria de imagens
@@ -250,31 +284,78 @@ export default function Vistoria() {
       ":" +
       currentdate.getSeconds();
 
-    const formData = new FormData();
-    formData.append("auto_number", `auto_number`);
-    formData.append("permit_holder_id", `${permitHolder?.id}`);
-    formData.append("user_id", ``);
-    formData.append("vehicle_id", ``);
-    formData.append("approach_id", ``);
-    formData.append("violation_code_id", ``);
-    formData.append("inspection_date", date);
-    formData.append("inspection_time", time);
-    formData.append("address", `${locations?.label}`);
-    formData.append("description", obs);
+    // const formData = new FormData();
+    // formData.append("permit_id", `${user.id}`);
+    // formData.append("permit_holder_id", `${permitHolder?.id}`);
+    // formData.append("vehicle_id", `${vehicle?.id}`);
+    // formData.append("user_id", `${permitHolder?.id}`);
+    // formData.append("inspection_location_id", `${locations?.value}`);
+    // formData.append("inspection_reason_id", `${inspectionReason}`); //motivo da vistoria
+    // formData.append("auto_number", `${user.id + 100}`);
+    // formData.append("inspection_date", `${date}`);
+    // formData.append("inspection_time", `${time}`);
+    // formData.append("advertising", ``);
+    // formData.append("final_observations", ``);
+    // formData.append("inspection_items", ``);
+    // formData.append("inspection_result", ``);
+    // formData.append("attachments", ``);
+    // imagens.forEach((image: any, index: number) => {
+    //   formData.append("attachments[]", {
+    //     ...image,
+    //     uri: image.uri,
+    //     name: `image_${index}.jpg`,
+    //     type: "image/jpeg",
+    //   } as any);
+    // });
+    // console.log(formData);
+    // let item = [{"1":{"exists":"1","additional_info":"teste","status":"inapto"},"2":{"exists":"1","additional_info":"teste","status":"apto"}}]
+    let data = new FormData();
+    data.append("permit_id", `1`);
+    data.append("permit_holder_id", `${permitHolder?.id}`);
+    data.append("vehicle_id", `${vehicle?.id}`);
+    data.append("user_id", `${user.id}`);
+    data.append("inspection_location_id", `${locations.value}`);
+    data.append("inspection_reason_id", `${inspectionReason}`);
+    data.append("auto_number", `20423`);
+    data.append("inspection_date", `${date}`);
+    data.append("inspection_time", `${time}`);
+    data.append("advertising", `${advertising}`);
+    data.append("final_observations", `${obs}`);
+    data.append("inspection_items", formData);
+    data.append("inspection_result", "");
     imagens.forEach((image: any, index: number) => {
-      formData.append("attachments[]", {
+      data.append("attachments[]", {
         ...image,
         uri: image.uri,
         name: `image_${index}.jpg`,
         type: "image/jpeg",
       } as any);
     });
-    formData.append("appeal_end_date", "2024-08-26");
-    console.log(formData);
+
+    const config = {     
+      method: "post",
+      maxBodyLength: Infinity, // React Native pode não precisar disso, depende do tamanho da requisição
+      url: "http://appbus.conexo.solutions:8990/api/v1/inspections",
+      headers: {
+        Authorization:
+          "9|cbLtIGqakUSTyBxe4bn9n6W72TisZhI2jBIsHeZz142b88ba",
+        "Content-Type": "multipart/form-data", // Definir o tipo de conteúdo
+      },
+      data: data,
+    };
+
+    // try {
+    //   const response = await axios.request(config);
+    //   console.log(JSON.stringify(response.data)); // Exibe a resposta no console
+    //   Alert.alert("Success", "Vistoria enviado com sucesso!");
+    // } catch (error) {
+    //   console.error(error); // Exibe o erro no console
+    //   Alert.alert("Error", "Failed to submit inspection");
+    // }
 
     try {
       setIsLoaded(true);
-      await server.postForm(`/inspection`, formData);
+      await server.postForm(`/inspections`, data);
       Alert.alert("Sucesso", "Vistoria enviado com sucesso!");
     } catch (error) {
       console.log(error);
@@ -495,6 +576,13 @@ export default function Vistoria() {
               <Field
                 className="my-4"
                 variant="primary"
+                placeholder="Anúncio/Propaganda"
+                onChangeText={setAdvertising}
+                value={advertising}
+              />
+              <Field
+                className="my-4"
+                variant="primary"
                 placeholder="Observação"
                 onChangeText={setObs}
                 value={obs}
@@ -506,7 +594,7 @@ export default function Vistoria() {
 
           {/* Salvar */}
           {permitHolder?.id ? (
-            <Button variant="primary" onPress={() => postInspection}>
+            <Button variant="primary" onPress={() => postInspection()}>
               <Button.TextButton title="SALVAR" />
             </Button>
           ) : (
