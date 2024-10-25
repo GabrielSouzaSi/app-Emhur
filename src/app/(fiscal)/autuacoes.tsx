@@ -484,7 +484,7 @@ export default function Autuacaoes() {
               variant="primary"
               onPress={() => setModal(MODAL.QR)}
             >
-              <Button.TextButton title="QR" />
+              <Button.TextButton title="QR CODE" />
             </Button>
             {/* Veiculo */}
             {vehicle?.id ? (
