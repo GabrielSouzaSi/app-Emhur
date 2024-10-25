@@ -153,7 +153,7 @@ export default function Escala() {
       setSelectedDay(data);
       setIsVisible(!isVisible);
     } catch (error: any) {
-      if(error.message){
+      if (error.message) {
         Alert.alert("Aviso", "Sem informações cadastradas!");
       }
       console.log(error);
@@ -194,13 +194,11 @@ export default function Escala() {
       <View>
         <HeaderBack title="Escala" variant="primary" />
         {markedDates && (
-          <Section className="bg-gray-400">
-            <Calendar
-              markedDates={markedDates}
-              markingType={"custom"}
-              onDayPress={onDayPress}
-            />
-          </Section>
+          <Calendar
+            markedDates={markedDates}
+            markingType={"custom"}
+            onDayPress={onDayPress}
+          />
         )}
         {markedDates && (
           <View style={styles.container}>

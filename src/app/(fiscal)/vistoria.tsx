@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
+import { useRouter } from "expo-router";
 
 import { useAuth } from "@/hooks/useAuth";
 
@@ -24,9 +25,6 @@ import { VehicleDTO } from "@/dtos/vehicleDTO";
 import { PermitHolderDTO } from "@/dtos/permitHolderDTO";
 import { InspectionItemDTO } from "@/dtos/inspectionItemDTO";
 import { Modal } from "@/components/modal";
-import axios from "axios";
-import { string } from "yup";
-import { json } from "drizzle-orm/mysql-core";
 
 enum MODAL {
   NONE = 0,
@@ -42,6 +40,8 @@ type Locations = {
 
 export default function Vistoria() {
   const [isLoaded, setIsLoaded] = useState(false);
+
+  const router = useRouter();
 
   const { user } = useAuth();
 
@@ -130,12 +130,13 @@ export default function Vistoria() {
           id: data.id,
           item: data.item,
           description: data.description,
-          info: "",
+          additional_info: "",
           status: "",
           exists: false,
         };
       });
       setInspectionItems(result);
+      onFormatInspectionItems(result);
     } catch (error) {
       console.log(error);
     }
@@ -152,41 +153,42 @@ export default function Vistoria() {
     setLocations(item);
   }
 
-  // Função recebe os dados do item da vistoria
-  function onInspectionItem(item: InspectionItemDTO) {
-    const result = inspectionItems?.map((data) => {
-      if (data.id == item.id) {
-        return {
-          [item.id]: {
-            exists: item.exists,
-            additional_info: item.info,
-            status: item.status,
-          },
-        };
-      } else {
-        return {
-          [data.id]: {
-            exists: data.exists,
-            additional_info: data.info,
-            status: data.status,
-          },
-        };
+  // Função atualiza os dados do item da vistoria
+  function onEditInspectionItem(updatedData: Partial<InspectionItemDTO>) {
+    const updatedItems = inspectionItems?.map((item) => {
+      if (item.id === updatedData.id) {
+        return { ...item, ...updatedData }; // Atualiza o item correspondente
       }
+      return item; // Retorna os outros itens inalterados
     });
-    console.log(result);
+    setInspectionItems(updatedItems);
+    onFormatInspectionItems(updatedItems);
+  }
 
-    const formattedData = result.reduce((acc, currentItem) => {
-      const [key, value] = Object.entries(currentItem)[0];
-
-      acc[key] = {
-        ...value
+  // Prepara os itens da vistoria para ser enviado no formato desejado
+  function onFormatInspectionItems(items: any) {
+    let result: any = [];
+    result = items?.map((data: any) => {
+      return {
+        [data.id]: {
+          exists: data.exists,
+          additional_info: data.additional_info,
+          status: data.status,
+        },
       };
+    });
 
-      return acc;
+    const formattedData = result.reduce((acc: any, currentItem: any) => {
+      // const [key, value] = Object.entries(currentItem)[0];
+
+      // acc[key] = {
+      //   ...value
+      // };
+
+      return { ...acc, ...currentItem };
     }, {});
 
     console.log(formattedData);
-    
 
     setFormData(formattedData);
   }
@@ -333,13 +335,12 @@ export default function Vistoria() {
       } as any);
     });
 
-    const config = {     
+    const config = {
       method: "post",
       maxBodyLength: Infinity, // React Native pode não precisar disso, depende do tamanho da requisição
       url: "http://appbus.conexo.solutions:8990/api/v1/inspections",
       headers: {
-        Authorization:
-          "9|cbLtIGqakUSTyBxe4bn9n6W72TisZhI2jBIsHeZz142b88ba",
+        Authorization: "9|cbLtIGqakUSTyBxe4bn9n6W72TisZhI2jBIsHeZz142b88ba",
         "Content-Type": "multipart/form-data", // Definir o tipo de conteúdo
       },
       data: data,
@@ -357,7 +358,7 @@ export default function Vistoria() {
     try {
       setIsLoaded(true);
       await server.postForm(`/inspections`, data);
-      Alert.alert("Sucesso", "Vistoria enviado com sucesso!");
+      Alert.alert("Sucesso", "Vistoria enviado com sucesso!", [{text: "OK", onPress: () => router.back()}]);
     } catch (error) {
       console.log(error);
     } finally {
@@ -546,7 +547,7 @@ export default function Vistoria() {
                 <InspectionItem
                   key={index}
                   item={item}
-                  onInspectData={onInspectionItem}
+                  onInspectData={onEditInspectionItem}
                 />
               ))}
 

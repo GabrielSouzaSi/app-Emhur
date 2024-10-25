@@ -1,7 +1,7 @@
 import { MenuCardSmall } from "@/components/menuCard";
 import { useCallback, useState } from "react";
 import { useEffect } from "react";
-import { Alert, View } from "react-native";
+import { Alert, ScrollView, View } from "react-native";
 import { useSQLiteContext } from "expo-sqlite";
 import { drizzle } from "drizzle-orm/expo-sqlite";
 import * as autuacaoSchema from "@/database/schemas/autuacaoSchema";
@@ -20,23 +20,20 @@ export default function MenuVistoria() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const { user } = useAuth();
-  const [violations, setViolations] = useState();
+  const [inspections, setInspections] = useState();
 
   const router = useRouter();
 
   const handleEdit = (item: any) => {
-    console.log(item);
-
-    router.push("/1");
+    router.push(`/inspection/${item}`);
   };
 
   // Função para receber as autuações do fiscal
-  async function getViolations() {
+  async function getInspections() {
     try {
       setIsLoaded(true);
-      const { data } = await server.get(`/agent/${user.id}/violations`);
-
-      setViolations(data.violations);
+      const { data } = await server.get(`/agent/${user.id}/inspections`);
+      setInspections(data.inspections);
     } catch (error) {
       throw error;
     } finally {
@@ -45,15 +42,20 @@ export default function MenuVistoria() {
   }
 
   useEffect(() => {
-    getViolations();
+    getInspections();
+  }, []);
+
+  useEffect(() => {
     if(isFocused){
-      const intervalId = setInterval(getViolations, 30000); // Configura o intervalo de 30 segundos
+      const intervalId = setInterval(getInspections, 30000); // Configura o intervalo de 30 segundos
       return () => clearInterval(intervalId);
     }
   }, [isFocused]);
+
   useFocusEffect(
     useCallback(() => {
       setIsFocused(true);// Está focado.
+      getInspections();
 
       return () => {
         setIsFocused(false); // Não está focado.
@@ -63,10 +65,11 @@ export default function MenuVistoria() {
   return (
     <View className="flex-1">
       <HeaderBack title="Histórico de Vistoria" variant="primary" />
+    <ScrollView>
+    {inspections ? <DataTable data={inspections} onEdit={handleEdit} /> : <></>}
+    </ScrollView>
 
-      {violations ? <DataTable data={violations} onEdit={handleEdit} /> : <></>}
-
-      <View className="mx-4">
+      <View className="m-4">
         <Button variant="primary" onPress={() => router.push("/vistoria")}>
           <Button.TextButton title="Cadastrar Vistoria" />
         </Button>

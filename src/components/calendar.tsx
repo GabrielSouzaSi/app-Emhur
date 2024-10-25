@@ -14,9 +14,10 @@ export function Calendar({ ...rest }: CalendarProps) {
     <RNCalendar
       hideExtraDays
       style={{
+        margin: 12,
         borderRadius: 12,
         overflow: "hidden",
-        backgroundColor: "transparent",
+        backgroundColor: colors.zinc[500],
       }}
       theme={{
         textMonthFontSize: 18,

@@ -37,7 +37,7 @@ const InspectionItem: React.FC<InspectionItemProps> = ({
       id: item.id,
       item: item.item,
       description: item.description,
-      info: description,
+      additional_info: description,
       status: selectedOption,
       exists: isEnabled,
     };

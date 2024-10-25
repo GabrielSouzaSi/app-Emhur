@@ -121,8 +121,7 @@ export default function HistoricoAutuacoes() {
     try {
       setIsLoaded(true);
       const { data } = await server.get(`/agent/${user.id}/violations`);
-      console.log(data.violations);
-      
+      console.log(data);
 
       setViolations(data.violations);
     } catch (error) {
@@ -154,22 +153,24 @@ export default function HistoricoAutuacoes() {
   }
 
   useEffect(() => {
-    getViolations();
     getViolationsCode();
   }, []);
+
   useEffect(() => {
-    if(isFocused){
+    if (isFocused) {
       const intervalId = setInterval(getViolations, 30000); // Configura o intervalo de 30 segundos
       return () => clearInterval(intervalId);
     }
   }, [isFocused]);
+
   useFocusEffect(
     useCallback(() => {
-      setIsFocused(true);// Está focado.
+      setIsFocused(true); // Está focado.
+      getViolations();
 
       return () => {
         setIsFocused(false); // Não está focado.
-      }
+      };
     }, [])
   );
   return (

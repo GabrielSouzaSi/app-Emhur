@@ -1,14 +1,7 @@
 import { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  FlatList,
-  TouchableOpacity,
-  Image,
-  Pressable,
-  Alert,
-} from "react-native";
+import { View, Text, ScrollView, Image } from "react-native";
+import { cssInterop } from "nativewind";
+
 import { useLocalSearchParams } from "expo-router";
 
 import { HeaderBack } from "@/components/headerBack";
@@ -16,30 +9,38 @@ import { Loading } from "@/components/loading";
 import { VehicleDTO } from "@/dtos/vehicleDTO";
 import { PermitHolderDTO } from "@/dtos/permitHolderDTO";
 import { server } from "@/server/api";
-import { string } from "yup";
 
-type ListCod = {
-  id: number;
-  description: string;
-};
+// Definimos um componente "Image" estilizado
+const StyledImage = cssInterop(Image, {
+  className: "style",
+});
 
 export default function IdAutuacao() {
   const { id } = useLocalSearchParams();
   const [isLoaded, setIsLoaded] = useState(false);
   const [vehicle, setVehicle] = useState<VehicleDTO>();
+  const [img , setImg] = useState([]);
   const [approach, setApproach] = useState("");
   const [description, setDescription] = useState("");
   const [code, setCode] = useState("");
   const [permitHolder, setPermitHolder] = useState<PermitHolderDTO>();
+
 
   async function getViolationCode() {
     try {
       setIsLoaded(true);
       const { data } = await server.get(`/violation/show/${id}`);
       const { vehicle_id, violation } = data;
+      console.log(violation);
+
+      const arr = JSON.parse(violation.attachments);
+      console.log(arr);
+      setImg(arr)
 
       setApproach(data.violation.approach.name);
-      setCode(`${data.violation.violation_code.code}:${data.violation.violation_code.description}`);
+      setCode(
+        `${data.violation.violation_code.code}:${data.violation.violation_code.description}`
+      );
       setDescription(data.violation.description);
       setVehicle(vehicle_id);
       setPermitHolder(data.violation.permit_holder);
@@ -53,6 +54,9 @@ export default function IdAutuacao() {
   useEffect(() => {
     getViolationCode();
   }, []);
+  useEffect(() => {
+    console.log(img);
+  }, [img]);
   return (
     <View>
       {/* Cabeçalho */}
@@ -215,6 +219,21 @@ export default function IdAutuacao() {
             <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
               <Text className="font-semiBold text-lg">{description}</Text>
             </View>
+          </View>
+          <View className="flex-1 justify-center items-center gap-4">
+            <Text className="text-gray-500 font-regular text-2xl font-bold">
+              Imagens:
+            </Text>
+            {img.map((item) => (
+              <StyledImage
+              key={item}
+              source={{
+                uri: `http://appbus.conexo.solutions:8990/storage/${item}`,
+              }} // URL da imagem
+              className="w-3/4 h-40 md:w-full md:h-64" // Altura ajustada pela proporção desejada
+              resizeMode="contain" // Ajusta o modo de redimensionamento para conter a imagem
+            />
+            ))}
           </View>
         </View>
       </ScrollView>

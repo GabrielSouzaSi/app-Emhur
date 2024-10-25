@@ -19,13 +19,12 @@ type Historico = {
   description: string;
   justification_penalty: null;
   appeal_end_date: string;
+  inspection_location_id: number;
+  inspection_reason_id: number;
+  inspection_date: string;
+  inspection_result: string;
 };
 
-type DataItem = {
-  numero: number;
-  nome: string;
-  status: string;
-};
 
 type DataTableProps = {
   data: Historico[];
@@ -33,6 +32,12 @@ type DataTableProps = {
 };
 
 const DataTable: React.FC<DataTableProps> = ({ data, onEdit }) => {
+  
+  const convertDate = (dateString: string): string => {
+    const [year, month, day] = dateString.split("-");
+    return `${day}/${month}/${year}`;
+  };
+
   return (
     <View className="m-4 border-2 border-gray-300 rounded-md">
       {/* Cabeçalho da Tabela */}
@@ -60,32 +65,37 @@ const DataTable: React.FC<DataTableProps> = ({ data, onEdit }) => {
       </View>
 
       {/* Linhas de Dados */}
-      <ScrollView>
-        {data.map((item, index) => (
-          <View
-            className="flex-row border-b py-2 px-3 border-gray-400"
-            key={index}
-          >
-            <View className="flex-1">
-              <Text>{item.auto_number}</Text>
-            </View>
-            <View className="flex-1">
-              <Text>{item.violation_date}</Text>
-            </View>
-            <View className="flex-1">
-              <Text>{item.judgement_status_id ? "Procedente":"Improcedente"}</Text>
-            </View>
-            <View className="flex">
-              <TouchableOpacity onPress={() => onEdit(item.id)}>
-                <MaterialCommunityIcons
-                  name="eye-outline"
-                  size={24}
-                  color={colors.blue[400]}
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
+      <ScrollView
+      showsVerticalScrollIndicator={false}
+      >
+      {data.map((item, index) => (
+      <View
+        className="flex-row border-b py-2 px-3 border-gray-400"
+        key={index}
+      >
+        <View className="flex-1">
+          <Text>{item.auto_number}</Text>
+        </View>
+        <View className="flex-1">
+          <Text>{item.violation_date ? convertDate(item.violation_date): convertDate(item.inspection_date) }</Text>
+        </View>
+        <View className="flex-1">
+          <Text>
+            {item.violation_date ? item.judgement_status_id ? "Procedente" : "Improcedente" : item.inspection_result}
+          </Text>
+        </View>
+        <View className="flex">
+          <TouchableOpacity onPress={() => onEdit(item.id)}>
+            <MaterialCommunityIcons
+              name="eye-outline"
+              size={24}
+              color={colors.blue[400]}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+    ))}
+        
       </ScrollView>
     </View>
   );
