@@ -8,7 +8,6 @@ import Constants from "expo-constants";
 import { drizzle } from "drizzle-orm/expo-sqlite";
 import { openDatabaseSync, SQLiteProvider } from "expo-sqlite";
 import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
-
 import migrations from "@drizzle/migrations";
 
 import {
@@ -33,7 +32,7 @@ const db = drizzle(expoDb);
 
 function StackLayout() {
   const { success, error } = useMigrations(db, migrations);
-  const { user, isLoadingUserStorageData } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
 
   const [isFontLoaded] = useFonts({
@@ -43,8 +42,9 @@ function StackLayout() {
     Montserrat_700Bold,
   });
 
-  // console.log("success", success);
+  console.log("Success =>", success);
   console.log("Error => ", error);
+  console.log("isFontLoaded => ", isFontLoaded);
   
 
   useEffect(() => {
@@ -69,7 +69,7 @@ function StackLayout() {
 
   return (
     <View className="flex-1" style={{ marginTop: statusBarHeight }}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar backgroundColor="#fff" barStyle="dark-content" />
       {isFontLoaded ? (
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />

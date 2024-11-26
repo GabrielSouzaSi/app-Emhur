@@ -65,9 +65,8 @@ export default function MenuVistoria() {
   return (
     <View className="flex-1">
       <HeaderBack title="Histórico de Vistoria" variant="primary" />
-    <ScrollView>
+      
     {inspections ? <DataTable data={inspections} onEdit={handleEdit} /> : <></>}
-    </ScrollView>
 
       <View className="m-4">
         <Button variant="primary" onPress={() => router.push("/vistoria")}>

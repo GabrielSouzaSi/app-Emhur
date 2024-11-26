@@ -1,4 +1,11 @@
-import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { HeaderBack } from "@/components/headerBack";
 import { Section } from "@/components/section";
 // import { Calendar } from "@/components/calendar";
@@ -128,13 +135,17 @@ export default function Escala() {
 
   // Função para buscar a lista dos locais da vistoria
   async function getListDates() {
+    setIsLoaded(true);
     try {
       const { data } = await server.get(
         `/schedules/user/${user.id}?start_date=${firstDate}&end_date=${lastDate}`
       );
       setMarkedDates(transformData(data));
       // setListLocations(result);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message) {
+        Alert.alert("Aviso", "Sem informações cadastradas!");
+      }
       console.log(error);
     } finally {
       setIsLoaded(false);
@@ -143,7 +154,7 @@ export default function Escala() {
 
   // Função para exibir os detalhes do dia selecionado
   async function onDayPress(day: any) {
-    console.log(day);
+    setIsLoaded(true);
 
     try {
       const { data } = await server.get(
@@ -157,6 +168,8 @@ export default function Escala() {
         Alert.alert("Aviso", "Sem informações cadastradas!");
       }
       console.log(error);
+    } finally {
+      setIsLoaded(false);
     }
     // setSelectedDay(day.dateString);
     // const event = events.find((e) => e.date === day.dateString);
@@ -191,36 +204,46 @@ export default function Escala() {
 
   return (
     <>
-      <View>
+      <View className="flex-1">
         <HeaderBack title="Escala" variant="primary" />
-        {markedDates && (
-          <Calendar
-            markedDates={markedDates}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 10 }}
+        >
+          {markedDates ? (
+            <Calendar
+              markedDates={markedDates}
+              markingType={"custom"}
+              onDayPress={onDayPress}
+            />
+          ): (<Calendar
+            markedDates={{}}
             markingType={"custom"}
             onDayPress={onDayPress}
-          />
-        )}
-        {markedDates && (
-          <View style={styles.container}>
-            <FlatList
-              data={data}
-              keyExtractor={(item) => item.key}
-              renderItem={({ item }) => (
-                <View style={styles.itemContainer}>
-                  <View
-                    style={[styles.circle, { backgroundColor: item.color }]}
-                  >
-                    <Text style={styles.circleText}>{item.letter}</Text>
+          />)}
+          {markedDates && (
+            <View className="p-5">
+              <FlatList
+                data={data}
+                keyExtractor={(item) => item.key}
+                renderItem={({ item }) => (
+                  <View className="flex-row items-center my-2.5">
+                    <View
+                    className="w-8 h-8 rounded-2xl items-center justify-center"
+                      style={{ backgroundColor: item.color }}
+                    >
+                      <Text style={styles.circleText}>{item.letter}</Text>
+                    </View>
+                    <Text style={styles.label}>{item.label}</Text>
                   </View>
-                  <Text style={styles.label}>{item.label}</Text>
-                </View>
-              )}
-              horizontal={false}
-              scrollEnabled={false}
-              showsVerticalScrollIndicator={false}
-            />
-          </View>
-        )}
+                )}
+                horizontal={false}
+                scrollEnabled={false}
+                showsVerticalScrollIndicator={false}
+              />
+            </View>
+          )}
+        </ScrollView>
       </View>
       <Modal
         variant="primary"
@@ -228,10 +251,15 @@ export default function Escala() {
         onClose={() => setIsVisible(false)}
       >
         {selectedDay?.id && (
-          <View className="flex">
+          <View className="flex-1">
             <Text className="mb-4 text-gray-500 font-regular text-2xl font-bold">
               Escala {convertDate(selectedDay?.date)}
             </Text>
+            <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 10 }}
+        >
+
             <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
               <View className="flex flex-row justify-between mb-4 gap-4">
                 <View className="flex-1">
@@ -250,8 +278,8 @@ export default function Escala() {
                   </Text>
                   <View className="bg-gray-300 rounded-md p-3">
                     <Text className="font-semiBold text-lg">
-                      {selectedDay?.shift.start_time}/
-                      {selectedDay?.shift.end_time}
+                      {selectedDay?.shift.start_time.slice(0,5)}/
+                      {selectedDay?.shift.end_time.slice(0,5)}
                     </Text>
                   </View>
                 </View>
@@ -288,7 +316,7 @@ export default function Escala() {
                     keyExtractor={(item) => item.name}
                     renderItem={({ item }) => (
                       <Text className="text-lg font-semiBold">
-                        {item.description}/{item.start_time}-{item.end_time}
+                        {item.description}/{item.start_time.slice(0,5)}-{item.end_time.slice(0,5)}
                       </Text>
                     )}
                     horizontal={false}
@@ -298,6 +326,7 @@ export default function Escala() {
                 </View>
               </View>
             </View>
+            </ScrollView>
           </View>
         )}
       </Modal>

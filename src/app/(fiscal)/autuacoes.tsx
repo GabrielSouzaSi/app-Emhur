@@ -9,6 +9,7 @@ import {
   Image,
   Pressable,
   Alert,
+  Modal as RNModal,
 } from "react-native";
 import * as Location from "expo-location";
 
@@ -20,6 +21,8 @@ import { drizzle } from "drizzle-orm/expo-sqlite";
 import { CameraView, useCameraPermissions } from "expo-camera";
 
 import * as autuacaoSchema from "@/database/schemas/autuacaoSchema";
+import * as infracaoSchema from "@/database/schemas/infracaoSchema";
+import * as approachSchema from "@/database/schemas/approachSchema";
 
 import { HeaderBack } from "@/components/headerBack";
 import { Field } from "@/components/input";
@@ -32,6 +35,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { VehicleDTO } from "@/dtos/vehicleDTO";
 import { PermitHolderDTO } from "@/dtos/permitHolderDTO";
 import { DropdownButton } from "@/components/buttonDropdown";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { checkInternetConnection } from "@/utils/networkStatus";
 
 enum MODAL {
   NONE = 0,
@@ -61,13 +66,18 @@ export default function Autuacaoes() {
 
   const isPermissionGranted = Boolean(permission?.granted);
 
+  const [isFocused, setIsFocused] = useState(false);
+  const [isConnected, setIsConnected] = useState<any>();
+
   // informação do usuário
   const { user } = useAuth();
   const [load, setLoad] = useState(false);
 
   const [isLoaded, setIsLoaded] = useState(false);
   const database = useSQLiteContext();
-  const db = drizzle(database, { schema: autuacaoSchema });
+  const dbAutuacoes = drizzle(database, { schema: autuacaoSchema });
+  const dbInfracoes = drizzle(database, { schema: infracaoSchema });
+  const dbApproach = drizzle(database, { schema: approachSchema });
 
   const [codeQr, setCodeQr] = useState("");
 
@@ -75,7 +85,7 @@ export default function Autuacaoes() {
   const router = useRouter();
 
   // Mode de Abordagem
-  const [approach, setApproach] = useState([]);
+  const [approach, setApproach] = useState<any>([]);
   const [abordagem, setAbordagem] = useState<number>();
 
   const qrCodeLock = useRef(false);
@@ -87,6 +97,7 @@ export default function Autuacaoes() {
   const [imagens, setImagens] = useState<ImagePicker.ImagePickerResult[] | any>(
     []
   );
+  const [imagensOff, setImagensOff] = useState<string[]>([]);
 
   // Localização do usuário
   const [location, setLocation] = useState<LatLong>();
@@ -130,7 +141,7 @@ export default function Autuacaoes() {
     try {
       setIsLoaded(true);
       const { data } = await server.get(`validation/${code}`);
-      setCondutor(data.holder)
+      setCondutor(data.holder);
 
       setModal(MODAL.NONE);
     } catch (error) {
@@ -170,11 +181,63 @@ export default function Autuacaoes() {
     ]);
   };
 
+  // Função para trazer os dados da tabela infracoes
+  async function fetchInfracoes() {
+    try {
+      const response = await dbInfracoes.query.infracao.findMany();
+
+      console.log("response dbInfracoes => ", response);
+      let cod = await response.map((item: any) => {
+        return {
+          id: item.id,
+          description: `${item.code}: ${item.description}`,
+        };
+      });
+      setCodigo(cod);
+      setSelecText(cod);
+    } catch (error) {
+      console.log("fetchInfracoes =>" + error);
+    } finally {
+      setIsLoaded(false);
+    }
+  }
+  // Função para trazer os dados da tabela approach
+  async function fetchAutuacao() {
+    try {
+      const response = await dbAutuacoes.query.autuacao.findMany();
+
+      console.log("autuacao => ", response);
+    } catch (error) {
+      console.log("fetchAutuacao error =>" + error);
+    }
+  }
+  // Função para trazer os dados da tabela approach
+  async function fetchApproach() {
+    try {
+      const response = await dbApproach.query.approach.findMany();
+
+      console.log("dbApproach => ", response);
+
+      let optionApproach = response.map((data: any) => {
+        return {
+          label: data.name,
+          value: data.id,
+        };
+      });
+
+      setApproach(optionApproach);
+    } catch (error) {
+      console.log("fetchInfracoes error =>" + error);
+    }
+  }
+
   async function getViolationCode() {
     try {
       setIsLoaded(true);
       const { data } = await server.get(`/vehicle/1`);
       const { approach } = data;
+      console.log(approach);
+
       let optionApproach = approach.map((data: any) => {
         return {
           label: data.name,
@@ -262,25 +325,75 @@ export default function Autuacaoes() {
       setIsLoaded(false);
     }
   }
+  async function addAutuacao() {
+    let gps = await getStatusGPS();
+    let lat, long;
 
-  async function fetchAutuacoes() {
+    if (gps) {
+      let result = await Location.getCurrentPositionAsync();
+      lat = result.coords.latitude;
+      long = result.coords.longitude;
+    } else {
+      Alert.alert("Erro!", "Não foi possível acessar sua localização.", [
+        {text: "Cancelar", style:"cancel"},
+        {text: "Tente Novamente", onPress: () => addAutuacao() },
+      ]);
+      return;
+    }
+    let currentdate = new Date();
+    let date =
+      +currentdate.getFullYear() +
+      "-" +
+      (currentdate.getMonth() + 1) +
+      "-" +
+      currentdate.getDate();
+
+    let time =
+      currentdate.getHours() +
+      ":" +
+      currentdate.getMinutes() +
+      ":" +
+      currentdate.getSeconds();
+
+    const data = [
+      {
+        vehicle: numero, // placa ou numero
+        imagens: imagensOff,
+        local: local,
+        latitude: lat.toString(),
+        longitude: long.toString(),
+        data: date,
+        hora: time,
+        approach: abordagem,
+        idInfracao: idInfracao,
+        obs: obs,
+        status: "Pendente",
+      },
+    ];
+    console.log(data);
+
     try {
-      const response = await db.query.autuacao.findMany();
+      const response = await dbAutuacoes
+        .insert(autuacaoSchema.autuacao)
+        .values(data)
+        .run();
 
       console.log(response);
-      // setData(response);
+      Alert.alert("Sucesso", "Autuação salva com sucesso!", [
+        { text: "OK", onPress: () => {} },
+      ]);
     } catch (error) {
+      Alert.alert("Algo deu errado!", "Tente novamente!");
       console.log(error);
     }
   }
 
-  async function addAutuacao() {
+  async function deleteDataAutuacao() {
     try {
-      const response = await db
-        .insert(autuacaoSchema.autuacao)
-        .values({ imagens });
+      const response = await dbAutuacoes.delete(autuacaoSchema.autuacao).run();
 
-      await fetchAutuacoes();
+      console.log(response);
+      fetchAutuacao();
     } catch (error) {
       console.log(error);
     }
@@ -317,12 +430,9 @@ export default function Autuacaoes() {
   }
 
   // Função para ter acesso a galeria de imagens
-  const askPermission = async (failureMessage: string) => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (status === "denied") {
-      alert(failureMessage);
-    }
+  const askPermission = async () => {
+    let rest = MediaLibrary.requestPermissionsAsync();
+    console.log(rest);
   };
 
   // Funação para ter acesso a camera
@@ -330,10 +440,8 @@ export default function Autuacaoes() {
     // Solicitar permissão para usar a câmera
     const { status: cameraStatus } =
       await ImagePicker.requestCameraPermissionsAsync();
-    // Solicitar permissão para salvar a imagem no álbum
-    const { status: mediaLibraryStatus } =
-      await MediaLibrary.requestPermissionsAsync();
-    if (cameraStatus !== "granted" || mediaLibraryStatus !== "granted") {
+
+    if (cameraStatus !== "granted") {
       alert(
         "Desculpe, precisamos das permissões da câmera e do álbum para isso funcionar!"
       );
@@ -358,22 +466,48 @@ export default function Autuacaoes() {
         type: "image/jpeg",
       };
       setImagens([...imagens, img]);
+      saveImage(img.uri);
     }
   };
-
-  // Recupera as informações do album "EmhurFiscal"
-  async function getAlbum() {
-    let album = await MediaLibrary.getAlbumAsync("EmhurFiscal");
-    console.log("Album => ", album);
-    // obtendo as mídias conti
-  }
-
   // Salva a foto na galeria
-  const saveImage = async (uri: any) => {
+  const saveImage = async (uri: string) => {
+    // Solicitar permissão para gerenciar mídia
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permissão necessária",
+        "Precisamos de permissão para salvar a imagem."
+      );
+      return;
+    }
     try {
+      // Salvar a imagem no álbum específico
       const asset = await MediaLibrary.createAssetAsync(uri);
-      await MediaLibrary.createAlbumAsync("EmhurFiscal", asset, false);
-      alert("Imagem salva com sucesso!");
+
+      // Verificar se o álbum já existe
+      let album = await MediaLibrary.getAlbumAsync("EmhurFiscal");
+
+      if (!album) {
+        album = await MediaLibrary.createAlbumAsync(
+          "EmhurFiscal",
+          asset,
+          false
+        );
+        alert("Imagem salva com sucesso!");
+      } else {
+        await MediaLibrary.addAssetsToAlbumAsync([asset], album.id, false);
+      }
+      // Buscar as fotos do álbum
+      const { assets } = await MediaLibrary.getAssetsAsync({
+        album: album.id,
+        mediaType: "photo",
+      });
+      // console.log(assets);
+
+      let img = assets.filter((item) => item.filename === asset.filename);
+
+      console.log(img[0].uri);
+      setImagensOff([...imagensOff, img[0].uri]);
     } catch (error) {
       console.log(error);
       alert("Erro ao salvar a imagem!");
@@ -382,17 +516,23 @@ export default function Autuacaoes() {
 
   // Função para selecinar imagem da galeria
   const pickImage = async () => {
-    await askPermission(
-      "Precisamos da permissão do rolo da câmera para ler as fotos do seu telefone..."
-    );
+    // Solicitar permissão para acessar a mídia
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permissão necessária",
+        "Precisamos de permissão para acessar sua biblioteca de mídia."
+      );
+      return;
+    }
 
+    // Abrir seletor de imagem
     let pickerResult = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 2],
       quality: 1,
     });
-    // console.log(pickerResult);
 
     if (!pickerResult.canceled) {
       let img = {
@@ -401,16 +541,24 @@ export default function Autuacaoes() {
         type: "image/jpeg",
       };
       setImagens([...imagens, img]);
+      setImagensOff([...imagensOff, img.uri]);
     }
   };
 
   // Função para remover imagem
   const removerImagem = (index: number) => {
-    let upImagens = [...imagens.slice(0, index), ...imagens.slice(index + 1)];
+    if (isConnected) {
+      let upImagens = [...imagens.slice(0, index), ...imagens.slice(index + 1)];
+      setImagens(upImagens);
+    } else {
+      let upImagensOff = [
+        ...imagensOff.slice(0, index),
+        ...imagensOff.slice(index + 1),
+      ];
+      setImagensOff(upImagensOff);
+    }
 
-    setImagens(upImagens);
-
-    if (imagens.length <= 1) setModal(MODAL.NONE);
+    if (imagens.length < 1) setModal(MODAL.NONE);
   };
 
   // pega o resultado da permissão fornecido pelo usuaáio
@@ -437,8 +585,19 @@ export default function Autuacaoes() {
     }
     return providerStatus.gpsAvailable;
   }
+
+  //função checkInternetConnection para verificar o status de conexão
+  const checkConnection = async () => {
+    const connected = await checkInternetConnection();
+    setIsConnected(connected);
+  };
   useEffect(() => {
-    getViolationCode();
+    checkConnection();
+  }, []);
+
+  useEffect(() => {
+    fetchApproach();
+    fetchInfracoes();
   }, []);
 
   useEffect(() => {
@@ -659,7 +818,7 @@ export default function Autuacaoes() {
                   <View className="flex flex-row justify-between mb-4 gap-4">
                     <View className="flex-1">
                       <Text className="text-gray-500 font-regular text-2xl font-bold">
-                      Categoria:
+                        Categoria:
                       </Text>
                       <View className="bg-gray-300 rounded-md p-3">
                         <Text className="font-semiBold text-lg">
@@ -669,7 +828,7 @@ export default function Autuacaoes() {
                     </View>
                     <View className="flex-1">
                       <Text className="text-gray-500 font-regular text-2xl font-bold">
-                      CNH:
+                        CNH:
                       </Text>
                       <View className="bg-gray-300 rounded-md p-3">
                         <Text className="font-semiBold text-lg">
@@ -715,9 +874,16 @@ export default function Autuacaoes() {
             </View>
 
             {/* Se houver imagem */}
-            {imagens.length ? (
+            {isConnected && imagens.length > 0 ? (
               <Button variant="primary" onPress={() => setModal(MODAL.IMAGENS)}>
                 <Button.TextButton title={`Imagens(${imagens.length})`} />
+              </Button>
+            ) : (
+              <></>
+            )}
+            {!isConnected && imagensOff.length > 0 ? (
+              <Button variant="primary" onPress={() => setModal(MODAL.IMAGENS)}>
+                <Button.TextButton title={`Imagens(${imagensOff.length})`} />
               </Button>
             ) : (
               <></>
@@ -764,9 +930,20 @@ export default function Autuacaoes() {
             </View>
 
             {/* Salvar */}
-            <Button variant="primary" onPress={() => postAutuacoa()}>
-              <Button.TextButton title="SALVAR" />
-            </Button>
+            {isConnected ? (
+              <Button variant="primary" onPress={() => postAutuacoa()}>
+                <Button.TextButton title="SALVAR" />
+              </Button>
+            ) : (
+              <View className="gap-4">
+                <Button variant="primary" onPress={() => addAutuacao()}>
+                  <Button.TextButton title="SALVAR OFFLINE" />
+                </Button>
+                <Button variant="primary" onPress={() => deleteDataAutuacao()}>
+                  <Button.TextButton title="DELETAR AUTUAÇÕES" />
+                </Button>
+              </View>
+            )}
           </View>
         </ScrollView>
         <Modal
@@ -777,13 +954,17 @@ export default function Autuacaoes() {
         >
           <View className="flex-1">
             <FlatList
-              data={imagens}
+              data={isConnected ? imagens : imagensOff}
               renderItem={({ item, index }) => (
                 <View className="w-full mb-4 bg-white p-2 rounded-md border-gray-300 border-2">
-                  <Image
-                    className="h-56 rounded-md"
-                    source={{ uri: item.uri }}
-                  />
+                  {isConnected ? (
+                    <Image
+                      className="h-56 rounded-md"
+                      source={{ uri: item.uri }}
+                    />
+                  ) : (
+                    <Image className="h-56 rounded-md" source={{ uri: item }} />
+                  )}
                   <Pressable
                     className="py-4 items-center"
                     onPress={() => removerImagem(index)}
@@ -824,11 +1005,7 @@ export default function Autuacaoes() {
             showsVerticalScrollIndicator={false}
           />
         </Modal>
-        <Modal
-          variant="primary"
-          visible={modal === MODAL.QR}
-          onClose={() => setModal(MODAL.NONE)}
-        >
+        <RNModal visible={modal === MODAL.QR} className="flex-1">
           <CameraView
             style={{ flex: 1 }}
             facing="back"
@@ -840,7 +1017,19 @@ export default function Autuacaoes() {
               }
             }}
           />
-        </Modal>
+          <View className="absolute top-5 right-4 z-50">
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setModal(MODAL.NONE)}
+            >
+              <MaterialCommunityIcons
+                name="close-circle-outline"
+                size={30}
+                color="white"
+              />
+            </TouchableOpacity>
+          </View>
+        </RNModal>
         <Modal
           variant="primary"
           visible={modal === MODAL.QRCODE}

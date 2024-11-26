@@ -31,8 +31,12 @@
       "typedRoutes": true
     },
     "plugins": [
-      ["expo-router"],
-      ["expo-font"],
+      [
+        "expo-router"
+      ],
+      [
+        "expo-font"
+      ],
       [
         "expo-camera",
         {
@@ -60,7 +64,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
         }
-      ]
+      ],
+      "expo-localization"
     ]
   }
 }

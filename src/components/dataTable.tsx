@@ -39,7 +39,7 @@ const DataTable: React.FC<DataTableProps> = ({ data, onEdit }) => {
   };
 
   return (
-    <View className="m-4 border-2 border-gray-300 rounded-md">
+    <View className="flex-1 m-4 border-2 border-gray-300 rounded-md">
       {/* Cabeçalho da Tabela */}
       <View className="flex flex-row py-2 px-3 bg-white">
         <View className="flex-1">

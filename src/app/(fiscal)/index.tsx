@@ -1,21 +1,13 @@
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { HeaderMenu } from "@/components/headerMenu";
 import { MenuCard } from "@/components/menuCard";
-import { useAuth } from "@/hooks/useAuth";
-
-
 
 export default function HomeFiscal() {
   const router = useRouter();
-  const { signOut } = useAuth();
-
-  function handleSignOut(){
-    signOut();
-  }
   return (
     <>
-      <HeaderMenu variant="primary" onLogout={() => handleSignOut()}/>
+      <HeaderMenu />
       <View className="flex flex-row justify-between px-5 ">
         <MenuCard
           onPress={() => router.push("/menuFiscalizacao")}

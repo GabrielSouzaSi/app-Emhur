@@ -1,9 +1,32 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "af2dd860-7917-4d35-97e6-044b18747782",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "37dcca96-00c4-4b4c-94c2-e2166536413a",
+  "prevId": "af2dd860-7917-4d35-97e6-044b18747782",
   "tables": {
+    "approachs": {
+      "name": "approachs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    },
     "autuacoes": {
       "name": "autuacoes",
       "columns": {

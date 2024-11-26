@@ -5,8 +5,22 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1728626287006,
-      "tag": "0000_little_odin",
+      "when": 1730021882754,
+      "tag": "0000_lumpy_sway",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1730134025542,
+      "tag": "0001_rich_rogue",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1730142660365,
+      "tag": "0002_steep_random",
       "breakpoints": true
     }
   ]

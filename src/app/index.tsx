@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Image, Text, View, Pressable } from "react-native";
+import { useEffect, useState } from "react";
+import { Image, Text, View, Pressable, Alert } from "react-native";
 import { useRouter, Link } from "expo-router";
 import { useForm, Controller } from "react-hook-form";
 
@@ -35,6 +35,7 @@ export default function Login() {
       await signIn(email, password);
     } catch (error) {
       console.log("Error =>", error);
+      Alert.alert("Aviso!","Não foi possível fazer login, tente novamente!");
 
       // const isAppError = error instanceof AppError;
 
@@ -48,10 +49,9 @@ export default function Login() {
     <>
       <Header title="Login" />
 
-      <View className="p-8">
+      <View className="flex-1 p-8 justify-center">
         <View className="items-center mb-10">
-          <Image className="mb-5" source={require("@/assets/prefeitura.png")} />
-          <Image source={require("@/assets/emhur.png")} />
+          <Image source={require("@/assets/emhur.png")} resizeMode="contain" />
         </View>
 
         <View>

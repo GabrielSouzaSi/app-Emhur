@@ -18,7 +18,7 @@ const MenuCard = forwardRef<TouchableOpacity, Props>(
       <TouchableOpacity
         ref={ref}
         className={clsx(
-          "bg-white p-2 py-3 border-l-4 shadow-slate-800 rounded-md items-center justify-center w-32",
+          "bg-white py-2 border-l-4 shadow-slate-800 rounded-md items-center justify-center flex-1 m-2",
           { "border-blue-500": variant === "primary" },
           { "border-green-500": variant === "secundary" },
           className
