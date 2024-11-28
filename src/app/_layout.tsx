@@ -8,7 +8,7 @@ import Constants from "expo-constants";
 import { drizzle } from "drizzle-orm/expo-sqlite";
 import { openDatabaseSync, SQLiteProvider } from "expo-sqlite";
 import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
-import migrations from "@drizzle/migrations";
+import migrations from "../../drizzle/migrations";
 
 import {
   useFonts,
@@ -45,7 +45,6 @@ function StackLayout() {
   console.log("Success =>", success);
   console.log("Error => ", error);
   console.log("isFontLoaded => ", isFontLoaded);
-  
 
   useEffect(() => {
     console.log("authState", user);
@@ -68,7 +67,7 @@ function StackLayout() {
   }, 2000);
 
   return (
-    <View className="flex-1" style={{ marginTop: statusBarHeight }}>
+    <View className="flex-1">
       <StatusBar backgroundColor="#fff" barStyle="dark-content" />
       {isFontLoaded ? (
         <Stack screenOptions={{ headerShown: false }}>
@@ -85,8 +84,8 @@ function StackLayout() {
 const RootLayoutNav = () => {
   return (
     <AuthContextProvider>
-      <SQLiteProvider databaseName={DATABASE_NAME} >
-      <StackLayout />
+      <SQLiteProvider databaseName={DATABASE_NAME}>
+        <StackLayout />
       </SQLiteProvider>
     </AuthContextProvider>
   );
