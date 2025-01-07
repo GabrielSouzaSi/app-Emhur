@@ -1,3 +1,7 @@
+if (__DEV__) {
+  require("../../ReactotronConfig");
+}
+
 import "@/styles/global.css";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar, View } from "react-native";
@@ -42,9 +46,9 @@ function StackLayout() {
     Montserrat_700Bold,
   });
 
-  console.log("Success =>", success);
-  console.log("Error => ", error);
-  console.log("isFontLoaded => ", isFontLoaded);
+  // console.log("Success =>", success);
+  // console.log("Error => ", error);
+  // console.log("isFontLoaded => ", isFontLoaded);
 
   useEffect(() => {
     console.log("authState", user);
@@ -55,7 +59,7 @@ function StackLayout() {
         router.replace("/");
       } else if (user?.id) {
         console.log("===Fiscal===");
-        router.replace("/(fiscal)");
+        router.replace("/fiscal");
       }
     } else {
       return;
@@ -72,7 +76,7 @@ function StackLayout() {
       {isFontLoaded ? (
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
-          <Stack.Screen name="(fiscal)" />
+          <Stack.Screen name="fiscal" />
         </Stack>
       ) : (
         <Loading />

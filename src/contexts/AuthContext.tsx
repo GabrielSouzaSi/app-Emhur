@@ -53,7 +53,7 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
     try {
       console.log("SignIn");
       const { data } = await server.post("/login", { email, password });
-      console.log("Response => ", data);
+      // console.log("Response => ", data);
 
       if (data.user && data.access_token) {
         await storageUserAndTokenSave(data.user, data.access_token);
