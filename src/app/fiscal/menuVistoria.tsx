@@ -1,20 +1,13 @@
-import { MenuCardSmall } from "@/components/menuCard";
-import { useCallback, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { useEffect } from "react";
-import { Alert, ScrollView, View } from "react-native";
-import { useSQLiteContext } from "expo-sqlite";
-import { drizzle } from "drizzle-orm/expo-sqlite";
-import * as autuacaoSchema from "@/database/schemas/autuacaoSchema";
-import * as infracaoSchema from "@/database/schemas/infracaoSchema";
+import { View } from "react-native";
 import { HeaderBack } from "@/components/headerBack";
-import { integer, sqliteTable } from "drizzle-orm/sqlite-core";
 import { Button } from "@/components/button";
 import { useRouter, useFocusEffect } from "expo-router";
 import DataTable from "@/components/dataTable";
 import { useAuth } from "@/hooks/useAuth";
 import { server } from "@/server/api";
 import { Loading } from "@/components/loading";
-import { string } from "yup";
 
 export default function MenuVistoria() {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -25,7 +18,7 @@ export default function MenuVistoria() {
   const router = useRouter();
 
   const handleEdit = (item: any) => {
-    router.push(`/inspection/${item}`);
+    router.push(`/fiscal/inspection/${item}`);
   };
 
   // Função para receber as autuações do fiscal
@@ -69,7 +62,7 @@ export default function MenuVistoria() {
     {inspections ? <DataTable data={inspections} onEdit={handleEdit} /> : <></>}
 
       <View className="m-4">
-        <Button variant="primary" onPress={() => router.push("/vistoria")}>
+        <Button variant="primary" onPress={() => router.push("/fiscal/vistoria")}>
           <Button.TextButton title="Cadastrar Vistoria" />
         </Button>
       </View>

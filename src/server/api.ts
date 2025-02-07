@@ -1,7 +1,7 @@
 import axios from "axios";
-
+//http://appbus.conexo.solutions:8990/api/v1
 const server = axios.create({
-    baseURL: "http://appbus.conexo.solutions:8990/api/v1"
+    baseURL: "https://fastify-auth-api.onrender.com"
 });
 
 

@@ -1,7 +1,3 @@
-if (__DEV__) {
-  require("../../ReactotronConfig");
-}
-
 import "@/styles/global.css";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar, View } from "react-native";
@@ -12,7 +8,7 @@ import Constants from "expo-constants";
 import { drizzle } from "drizzle-orm/expo-sqlite";
 import { openDatabaseSync, SQLiteProvider } from "expo-sqlite";
 import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
-import migrations from "../../drizzle/migrations";
+import migrations from "../../drizzle/migrations.js";
 
 import {
   useFonts,

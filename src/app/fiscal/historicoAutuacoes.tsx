@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Alert, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -112,7 +112,7 @@ export default function HistoricoAutuacoes() {
   // Função para visualizar a autuação selecionada
   const handleEdit = (item: any) => {
     // console.log(item);
-    router.push(`/${item}`);
+    router.push(`/fiscal/${item}`);
   };
   // Função para abrir o modal de opções da autuação selecionada
   const handleOption = (item: any) => {
@@ -255,12 +255,40 @@ export default function HistoricoAutuacoes() {
     <View className="flex-1">
       <HeaderBack title="Histórico de Autuações" variant="primary" />
 
-      <View className="m-4">
-        <MaterialCommunityIcons
-          name="circle"
-          size={24}
-          color={isConnected ? "green" : "red"}
-        />
+      <View className="flex flex-row justify-between m-4">
+        {isConnected ? (<>
+          <View className="flex-1 mr-2">
+            <Button variant="primary" className="flex-row">
+              <Button.TextButton title="Online" />
+              <MaterialCommunityIcons
+                name="circle"
+                size={24}
+                color={"green"}
+              />
+            </Button>
+          </View>
+          <View className="flex-1 ml-2">
+            <Button variant="primary" className="flex-row">
+              <Button.TextButton title="Offline" />
+              <MaterialCommunityIcons
+                name="circle"
+                size={24}
+                color={"red"}
+              />
+            </Button>
+          </View>
+        </>) : (
+          <View className="flex-1 mr-2">
+            <Button variant="primary" className="flex-row">
+              <Button.TextButton title="Offline" />
+              <MaterialCommunityIcons
+                name="circle"
+                size={24}
+                color={"red"}
+              />
+            </Button>
+          </View>
+        )}
       </View>
       {violations ? (
         <View className="mx-4">
@@ -288,7 +316,7 @@ export default function HistoricoAutuacoes() {
       )}
       {violations ? <DataTable data={violations} onEdit={handleEdit} /> : <></>}
       <View className="m-4">
-        <Button variant="primary" onPress={() => router.push("/autuacoes")}>
+        <Button variant="primary" onPress={() => router.push("/fiscal/autuacoes")}>
           <Button.TextButton title="Cadastrar Autuação" />
         </Button>
       </View>

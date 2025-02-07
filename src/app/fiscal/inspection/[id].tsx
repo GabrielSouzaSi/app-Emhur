@@ -210,7 +210,7 @@ export default function IdInspection() {
                 </View>
               </View>
             ) : (
-              <></>
+              ""
             )}
 
           {/* Motivo da Vistoria */}
@@ -269,7 +269,7 @@ export default function IdInspection() {
           </View>
         </View>
       </ScrollView>
-      {isLoaded ? <Loading /> : <></>}
+      {isLoaded ? <Loading /> : ""}
     </View>
   );
 }

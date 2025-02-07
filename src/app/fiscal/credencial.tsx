@@ -1,3 +1,4 @@
+import React from "react";
 import { Text, View } from "react-native";
 import { HeaderBack } from "@/components/headerBack";
 import { MaterialCommunityIcons } from "@expo/vector-icons";

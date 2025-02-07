@@ -8,7 +8,7 @@
     "scheme": "appemhur",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash01.png",
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -17,7 +17,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.gabrielsouza.appEmhur"
     },
     "web": {
       "bundler": "metro",
@@ -27,11 +28,34 @@
     "extra": {
       "eas": {
         "projectId": "d681dc5a-5d43-4e64-a48a-04745fd3335a"
+      },
+      "packagerOpts": {
+        "config": "metro.config.js",
+        "sourceExts": [
+          "ts",
+          "tsx",
+          "js",
+          "jsx",
+          "json",
+          "sql"
+        ]
       }
     },
     "plugins": [
-      "expo-router",
-      "expo-sqlite",
+      [
+        "expo-router"
+      ],
+      [
+        "expo-sqlite",
+        {
+          "enableFTS": true,
+          "useSQLCipher": true,
+          "android": {
+            "enableFTS": false,
+            "useSQLCipher": false
+          }
+        }
+      ],
       [
         "expo-image-picker",
         {

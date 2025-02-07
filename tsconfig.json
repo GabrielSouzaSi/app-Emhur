@@ -1,16 +1,17 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true,
+    "baseUrl": "./",
     "paths": {
       "@/*": [
-        "./src/*"
+        "src/*"
       ]
     }
   },
   "include": [
     "**/*.js",
-    "drizzle/migrations.js",
+    "**/*.sql",
+    "./drizzle/migrations.js",
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
