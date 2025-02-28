@@ -1,12 +1,13 @@
 import "@/styles/global.css";
+import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar, View } from "react-native";
 import React, { useEffect } from "react";
 import * as SplashScreen from "expo-splash-screen";
-import Constants from "expo-constants";
+
 // Database
-import { drizzle } from "drizzle-orm/expo-sqlite";
-import { openDatabaseSync, SQLiteProvider } from "expo-sqlite";
+import { DATABASE_NAME, db, expoDb } from "@/database/connection";
+import { SQLiteProvider } from "expo-sqlite";
 import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
 import migrations from "../../drizzle/migrations.js";
 
@@ -23,15 +24,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { Loading } from "@/components/loading";
 
 SplashScreen.preventAutoHideAsync();
-const statusBarHeight = Constants.statusBarHeight;
-
-const DATABASE_NAME = "databese.db";
-
-const expoDb = openDatabaseSync(DATABASE_NAME);
-const db = drizzle(expoDb);
 
 function StackLayout() {
   const { success, error } = useMigrations(db, migrations);
+  useDrizzleStudio(expoDb)
   const { user } = useAuth();
   const router = useRouter();
 
@@ -47,10 +43,8 @@ function StackLayout() {
   // console.log("isFontLoaded => ", isFontLoaded);
 
   useEffect(() => {
-    console.log("authState", user);
-    console.log(isFontLoaded, success);
-    
-
+    // console.log("authState", user);
+    // console.log(isFontLoaded, success);
     if (isFontLoaded && success) {
       if (!user?.id) {
         console.log("===Login===");

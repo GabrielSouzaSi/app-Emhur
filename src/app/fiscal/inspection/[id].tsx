@@ -30,8 +30,6 @@ export default function IdInspection() {
   const [condutor, setCondutor] = useState<any>(false);
   const [advertising, setAdvertising] = useState("");
   const [description, setDescription] = useState("");
-  const [code, setCode] = useState("");
-  const [permitHolder, setPermitHolder] = useState<PermitHolderDTO>();
 
   async function getInspectionID() {
     try {
@@ -41,7 +39,7 @@ export default function IdInspection() {
       setCondutor(data.inspection.permit.holder);
       setAdvertising(data.inspection.advertising);
       setDescription(data.inspection.final_observations);
-      const arr = JSON.parse(data.inspection.attachments);      
+      const arr = JSON.parse(data.inspection.attachments);            
       setImg(arr)
     } catch (error) {
       throw error;
@@ -51,14 +49,12 @@ export default function IdInspection() {
   }
 
   useEffect(() => {
-    getInspectionID();
-    console.log("ID = "+id);
-        
+    getInspectionID();        
   }, []);
   return (
     <View>
       {/* Cabeçalho */}
-      <HeaderBack title={`Autuação Nº `} variant="primary" />
+      <HeaderBack title={`Vistoria Nº `} variant="primary" />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}

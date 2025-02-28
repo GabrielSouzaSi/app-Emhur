@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Image, Text, View, Pressable, Alert } from "react-native";
+import { Image, Text, View, Pressable, Alert, Keyboard } from "react-native";
 import { useRouter } from "expo-router";
 import { useForm, Controller } from "react-hook-form";
 
@@ -28,19 +28,14 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
 
   async function handleSignIn({ email, password }: FormData) {
-    // console.log("Login e senha => ", email, password);
-
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      await signIn(email, password);
+      await signIn(email.toLowerCase(), password);
     } catch (error) {
       console.log("Error =>", error);
       Alert.alert("Aviso!","Não foi possível fazer login, tente novamente!");
-
-      // const isAppError = error instanceof AppError;
-
-      // const title =  isAppError ? error.message : 'Não foi possível entrar. Tente novamente mais tarde.'
     } finally {
+      Keyboard.dismiss()
       setIsLoading(false);
     }
   }
@@ -52,7 +47,6 @@ export default function Login() {
       <View className="flex-1 p-8 justify-center">
         <View className="items-center mb-10">
         <Image className="w-48 h-48" source={require("@/assets/adaptive-icon.png")} />
-          {/* <Image source={require("@/assets/adaptive-icon.png")} resizeMode="contain" /> */}
         </View>
 
         <View>
@@ -92,7 +86,7 @@ export default function Login() {
                 secureTextEntry
                 textContentType="password"
                 onChangeText={onChange}
-                onSubmitEditing={handleSubmit(handleSignIn)}
+                onSubmitEditing={() => handleSubmit(handleSignIn)}
                 returnKeyType="send"
               />
             )}

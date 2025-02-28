@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useContext } from "react";
 import { useRouter } from "expo-router";
 import {
   View,
@@ -10,19 +10,13 @@ import {
   Pressable,
   Alert,
   Modal as RNModal,
+  Keyboard,
 } from "react-native";
 import * as Location from "expo-location";
 
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
-import { useSQLiteContext } from "expo-sqlite";
-import { drizzle } from "drizzle-orm/expo-sqlite";
-
-import { CameraView, useCameraPermissions } from "expo-camera";
-
-import * as autuacaoSchema from "@/database/schemas/autuacaoSchema";
-import * as infracaoSchema from "@/database/schemas/infracaoSchema";
-import * as approachSchema from "@/database/schemas/approachSchema";
+import { CameraView } from "expo-camera";
 
 import { HeaderBack } from "@/components/headerBack";
 import { Field } from "@/components/input";
@@ -36,7 +30,10 @@ import { VehicleDTO } from "@/dtos/vehicleDTO";
 import { PermitHolderDTO } from "@/dtos/permitHolderDTO";
 import { DropdownButton } from "@/components/buttonDropdown";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { checkInternetConnection } from "@/utils/networkStatus";
+import { getDatabaseViolationCode } from "@/database/violationsCode";
+import { addDatabaseViolation } from "@/database/violation";
+import { getDatabaseApproach } from "@/database/approach";
+import { NetworkContext } from "@/contexts/NetworkContext";
 
 enum MODAL {
   NONE = 0,
@@ -50,35 +47,15 @@ type ListCod = {
   description: string;
 };
 
-type Option = {
-  id: number;
-  name: string;
-};
-
-type LatLong = {
-  latitude: number;
-  longitude: number;
-};
-
 export default function Autuacaoes() {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [permission, requestPermission] = useCameraPermissions();
-  // const [permissionResponse, requestMediaLibraryPermissionsAsync] = MediaLibrary.usePermissions();
 
-  const isPermissionGranted = Boolean(permission?.granted);
-
-  const [isFocused, setIsFocused] = useState(false);
-  const [isConnected, setIsConnected] = useState<any>();
+  const { isConnect } = useContext(NetworkContext)
 
   // informação do usuário
   const { user } = useAuth();
   const [load, setLoad] = useState(false);
 
   const [isLoaded, setIsLoaded] = useState(false);
-  const database = useSQLiteContext();
-  const dbAutuacoes = drizzle(database, { schema: autuacaoSchema });
-  const dbInfracoes = drizzle(database, { schema: infracaoSchema });
-  const dbApproach = drizzle(database, { schema: approachSchema });
 
   const [codeQr, setCodeQr] = useState("");
 
@@ -100,8 +77,6 @@ export default function Autuacaoes() {
   );
   const [imagensOff, setImagensOff] = useState<string[]>([]);
 
-  // Localização do usuário
-  const [location, setLocation] = useState<LatLong>();
   // Condutor
   const [condutor, setCondutor] = useState<any>(false);
 
@@ -120,6 +95,7 @@ export default function Autuacaoes() {
   // Recebe a lista de códigos
   const [codigo, setCodigo] = useState<ListCod[]>([]);
   const [selecText, setSelecText] = useState<ListCod[]>([]);
+
   // Busca as informações do veículo
   async function searchPlate(req: any) {
     try {
@@ -180,11 +156,10 @@ export default function Autuacaoes() {
     ]);
   };
   // Função para trazer os dados da tabela infracoes
-  async function fetchInfracoes() {
+  async function getViolationCode() {
     try {
-      const response = await dbInfracoes.query.infracao.findMany();
+      const response = await getDatabaseViolationCode();
 
-      console.log("response dbInfracoes => ", response);
       let cod = await response.map((item: any) => {
         return {
           id: item.id,
@@ -200,21 +175,9 @@ export default function Autuacaoes() {
     }
   }
   // Função para trazer os dados da tabela approach
-  async function fetchAutuacao() {
+  async function getApproach() {
     try {
-      const response = await dbAutuacoes.query.autuacao.findMany();
-
-      console.log("autuacao => ", response);
-    } catch (error) {
-      console.log("fetchAutuacao error =>" + error);
-    }
-  }
-  // Função para trazer os dados da tabela approach
-  async function fetchApproach() {
-    try {
-      const response = await dbApproach.query.approach.findMany();
-
-      console.log("dbApproach => ", response);
+      const response = await getDatabaseApproach();
 
       let optionApproach = response.map((data: any) => {
         return {
@@ -228,171 +191,117 @@ export default function Autuacaoes() {
       console.log("fetchInfracoes error =>" + error);
     }
   }
-  async function getViolationCode() {
-    try {
-      setIsLoaded(true);
-      const { data } = await server.get(`/vehicle/1`);
-      const { approach } = data;
-      console.log(approach);
-
-      let optionApproach = approach.map((data: any) => {
-        return {
-          label: data.name,
-          value: data.id,
-        };
-      });
-
-      setApproach(optionApproach);
-      const { violationCode } = data;
-      let cod = await violationCode.map((item: any) => {
-        return {
-          id: item.id,
-          description: `${item.code}: ${item.description}`,
-        };
-      });
-      setCodigo(cod);
-      setSelecText(cod);
-    } catch (error) {
-      throw error;
-    } finally {
-      setIsLoaded(false);
-    }
-  }
   // Criar a autuacao
-  async function postAutuacao() {
-    let gps = await getStatusGPS();
-    let lat, long;
+  async function postViolation() {
+    setIsLoaded(true);
+    let status = await statusGPS();
+    if (status) {
+      let loc: Location.LocationObject = status
+      let currentdate = new Date();
+      let date =
+        +currentdate.getFullYear() +
+        "-" +
+        (currentdate.getMonth() + 1) +
+        "-" +
+        currentdate.getDate();
 
-    if (gps) {
-      let result = await Location.getCurrentPositionAsync();
-      lat = result.coords.latitude;
-      long = result.coords.longitude;
+      let time =
+        currentdate.getHours() +
+        ":" +
+        currentdate.getMinutes() +
+        ":" +
+        currentdate.getSeconds();
+
+      const formData = new FormData();
+      formData.append("auto_number", time);
+      formData.append("permit_holder_id", `${permitHolder?.id}`);
+      formData.append("user_id", `${user.id}`);
+      formData.append("vehicle_id", `${vehicle?.id}`);
+      formData.append("approach_id", `${abordagem}`);
+      formData.append("violation_code_id", `${idInfracao}`);
+      formData.append("violation_date", date);
+      formData.append("violation_time", time);
+      formData.append("latitude", `${loc.coords.latitude}`);
+      formData.append("longitude", `${loc.coords.longitude}`);
+      formData.append("address", local);
+      formData.append("description", obs);
+      imagens.forEach((image: any, index: number) => {
+        formData.append("attachments[]", {
+          ...image,
+          uri: image.uri,
+          name: `image_${index}.jpg`,
+          type: "image/jpeg",
+        } as any);
+      });
+      formData.append("appeal_end_date", "2024-08-26");
+
+      try {
+        await server.postForm(`/violations`, formData);
+        Alert.alert("Sucesso", "Autuação enviado com sucesso!", [
+          { text: "OK", onPress: () => router.back() },
+        ]);
+      } catch (error) {
+        Alert.alert("Algo deu errado!", "Tente novamente!");
+        console.log(error);
+      } finally {
+        setIsLoaded(false);
+      }
     } else {
-      return;
-    }
-    let currentdate = new Date();
-    let date =
-      +currentdate.getFullYear() +
-      "-" +
-      (currentdate.getMonth() + 1) +
-      "-" +
-      currentdate.getDate();
-
-    let time =
-      currentdate.getHours() +
-      ":" +
-      currentdate.getMinutes() +
-      ":" +
-      currentdate.getSeconds();
-
-    const formData = new FormData();
-    formData.append("auto_number", `auto_number`);
-    formData.append("permit_holder_id", `${permitHolder?.id}`);
-    formData.append("user_id", `${user.id}`);
-    formData.append("vehicle_id", `${vehicle?.id}`);
-    formData.append("approach_id", `${abordagem}`);
-    formData.append("violation_code_id", `${idInfracao}`);
-    formData.append("violation_date", date);
-    formData.append("violation_time", time);
-    formData.append("latitude", `${lat}`);
-    formData.append("longitude", `${long}`);
-    formData.append("address", local);
-    formData.append("description", obs);
-    imagens.forEach((image: any, index: number) => {
-      formData.append("attachments[]", {
-        ...image,
-        uri: image.uri,
-        name: `image_${index}.jpg`,
-        type: "image/jpeg",
-      } as any);
-    });
-    formData.append("appeal_end_date", "2024-08-26");
-    console.log(formData);
-
-    try {
-      setIsLoaded(true);
-      await server.postForm(`/violations`, formData);
-      Alert.alert("Sucesso", "Autuação enviado com sucesso!", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
-    } catch (error) {
-      Alert.alert("Algo deu errado!", "Tente novamente!");
-      console.log(error);
-    } finally {
       setIsLoaded(false);
     }
   }
-  async function addAutuacao() {
-    let gps = await getStatusGPS();
-    let lat, long;
+  // Cadastra a autuação no banco
+  async function addViolation() {
+    setIsLoaded(true);
+    let status = await statusGPS();
+    if (status) {
+      let loc: Location.LocationObject = status
 
-    if (gps) {
-      let result = await Location.getCurrentPositionAsync();
-      lat = result.coords.latitude;
-      long = result.coords.longitude;
+      let currentdate = new Date();
+      let date =
+        +currentdate.getFullYear() +
+        "-" +
+        (currentdate.getMonth() + 1) +
+        "-" +
+        currentdate.getDate();
+
+      let time =
+        currentdate.getHours() +
+        ":" +
+        currentdate.getMinutes() +
+        ":" +
+        currentdate.getSeconds();
+        
+      const data = [
+        {
+          vehicle: numero, // placa ou numero
+          imagens: imagensOff,
+          local: local,
+          latitude: `${loc.coords.latitude}`,
+          longitude: `${loc.coords.longitude}`,
+          data: date,
+          hora: time,
+          approach: `${abordagem}`,
+          idInfracao: `${idInfracao}`,
+          obs: obs,
+          status: "Pendente",
+        },
+      ];
+
+      try {
+        await addDatabaseViolation(data);
+        setIsLoaded(false);
+        Alert.alert("Sucesso", "Autuação salva com sucesso!", [
+          { text: "OK", onPress: () => router.back() },
+        ]);
+      } catch (error) {
+        Alert.alert("Algo deu errado!", "Não foi possível salvar!");
+        console.log(error);
+      } finally {
+        setIsLoaded(false);
+      }
     } else {
-      Alert.alert("Erro!", "Não foi possível acessar sua localização.", [
-        { text: "Cancelar", style: "cancel" },
-        { text: "Tente Novamente", onPress: () => addAutuacao() },
-      ]);
-      return;
-    }
-    let currentdate = new Date();
-    let date =
-      +currentdate.getFullYear() +
-      "-" +
-      (currentdate.getMonth() + 1) +
-      "-" +
-      currentdate.getDate();
-
-    let time =
-      currentdate.getHours() +
-      ":" +
-      currentdate.getMinutes() +
-      ":" +
-      currentdate.getSeconds();
-
-    const data = [
-      {
-        vehicle: numero, // placa ou numero
-        imagens: imagensOff,
-        local: local,
-        latitude: lat.toString(),
-        longitude: long.toString(),
-        data: date,
-        hora: time,
-        approach: abordagem,
-        idInfracao: idInfracao,
-        obs: obs,
-        status: "Pendente",
-      },
-    ];
-    console.log(data);
-
-    try {
-      const response = await dbAutuacoes
-        .insert(autuacaoSchema.autuacao)
-        .values(data)
-        .run();
-
-      console.log(response);
-      Alert.alert("Sucesso", "Autuação salva com sucesso!", [
-        { text: "OK", onPress: () => { } },
-      ]);
-    } catch (error) {
-      Alert.alert("Algo deu errado!", "Tente novamente!");
-      console.log(error);
-    }
-  }
-
-  async function deleteDataAutuacao() {
-    try {
-      const response = await dbAutuacoes.delete(autuacaoSchema.autuacao).run();
-
-      console.log(response);
-      fetchAutuacao();
-    } catch (error) {
-      console.log(error);
+      setIsLoaded(false);
     }
   }
 
@@ -426,29 +335,8 @@ export default function Autuacaoes() {
     setModal(MODAL.NONE);
   }
 
-  // Função para ter acesso a galeria de imagens
-  const askPermission = async () => {
-    let rest = MediaLibrary.requestPermissionsAsync();
-    console.log(rest);
-  };
-
-  // Funação para ter acesso a camera
-  const askCameraPermission = async () => {
-    // Solicitar permissão para usar a câmera
-    const { status: cameraStatus } =
-      await ImagePicker.requestCameraPermissionsAsync();
-
-    if (cameraStatus !== "granted") {
-      alert(
-        "Desculpe, precisamos das permissões da câmera e do álbum para isso funcionar!"
-      );
-      return;
-    }
-  };
-
   // Função para tirar foto
   const takePhoto = async () => {
-    await askCameraPermission();
     const pickerResult = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -463,7 +351,7 @@ export default function Autuacaoes() {
         type: "image/jpeg",
       };
       setImagens([...imagens, img]);
-      if (!isConnected) saveImage(img.uri);
+      if (!isConnect) saveImage(img.uri);
     }
   };
   // Salva a foto na galeria
@@ -487,7 +375,7 @@ export default function Autuacaoes() {
 
       if (!album) {
         album = await MediaLibrary.createAlbumAsync(
-          "EmhurFiscal",
+          "appFiscal",
           asset,
           false
         );
@@ -513,19 +401,9 @@ export default function Autuacaoes() {
 
   // Função para selecinar imagem da galeria
   const pickImage = async () => {
-    // Solicitar permissão para acessar a mídia
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permissão necessária",
-        "Precisamos de permissão para acessar sua biblioteca de mídia."
-      );
-      return;
-    }
-
     // Abrir seletor de imagem
     let pickerResult = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [4, 2],
       quality: 1,
@@ -544,7 +422,7 @@ export default function Autuacaoes() {
 
   // Função para remover imagem
   const removerImagem = (index: number) => {
-    if (isConnected) {
+    if (isConnect) {
       let upImagens = [...imagens.slice(0, index), ...imagens.slice(index + 1)];
       setImagens(upImagens);
     } else {
@@ -554,63 +432,48 @@ export default function Autuacaoes() {
       ];
       setImagensOff(upImagensOff);
     }
-
     if (imagens.length < 1) setModal(MODAL.NONE);
+    if (imagensOff.length < 1) setModal(MODAL.NONE);
   };
 
-  // pega o resultado da permissão fornecido pelo usuaáio
-  const checkGpsStatus = async () => {
-    const { granted } = await Location.requestForegroundPermissionsAsync();
-    console.log(granted);
+  useEffect(() => {
+    getApproach();
+    getViolationCode();
+  }, []);
 
-    // verifica se a permissão não foi concedida
-    if (!granted) {
-      Alert.alert("Aviso!", `Permita o acesso ao GPS.`, [{ text: "OK" }]);
-      checkGpsStatus();
-    }
-    getStatusGPS();
-  };
-
-  async function getStatusGPS() {
-    // Verifica se o GPS está ativo
-    const providerStatus = await Location.getProviderStatusAsync();
-
-    if (!providerStatus.gpsAvailable) {
-      Alert.alert("Aviso!", `Ative o GPS.`, [
-        { text: "OK", onPress: () => getStatusGPS() },
+  // Solicitar permissão
+  async function getPermissionGPS() {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    
+    if (status !== "granted") {
+      Alert.alert("Permissão negada", "Dê permissão da localização para continuar.", [
+        { text: "OK", onPress: () => getPermissionGPS() },
       ]);
+      return;
+    } else {
+      await statusGPS()
     }
-    return providerStatus.gpsAvailable;
+  }
+  // Verificar se o GPS está ativado
+  async function statusGPS() {
+    const isGPSEnabled = await Location.hasServicesEnabledAsync();    
+
+    if (!isGPSEnabled) {
+      Alert.alert("GPS desativado", "Ative o GPS para capturar a localização.");
+      return false
+    } else {
+      // Capturar localização
+      const userLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      // Armazena a localização no estado
+      return userLocation;
+    }
   }
 
-  //função checkInternetConnection para verificar o status de conexão
-  const checkConnection = async () => {
-    const connected = await checkInternetConnection();
-    setIsConnected(connected);
-  };
   useEffect(() => {
-    checkConnection();
+    getPermissionGPS();
   }, []);
-
-  useEffect(() => {
-    fetchApproach();
-    fetchInfracoes();
-  }, []);
-
-  useEffect(() => {
-    checkGpsStatus();
-  }, []);
-
-  useEffect(() => {
-    (async () => {
-      if (!permission) {
-        const { granted } = await requestPermission();
-        setHasPermission(granted);
-      } else {
-        setHasPermission(permission.granted);
-      }
-    })();
-  }, [permission]);
 
   return (
     <>
@@ -629,7 +492,7 @@ export default function Autuacaoes() {
                   variant="primary"
                   placeholder="placa ou número"
                   onChangeText={setNumero}
-                  onSubmitEditing={() => searchPlate(numero)}
+                  onSubmitEditing={() => isConnect ? searchPlate(numero) : Keyboard.dismiss()}
                   returnKeyType="send"
                 />
               </View>
@@ -871,14 +734,14 @@ export default function Autuacaoes() {
             </View>
 
             {/* Se houver imagem */}
-            {isConnected && imagens.length > 0 ? (
+            {isConnect && imagens.length > 0 ? (
               <Button variant="primary" onPress={() => setModal(MODAL.IMAGENS)}>
                 <Button.TextButton title={`Imagens(${imagens.length})`} />
               </Button>
             ) : (
               <></>
             )}
-            {!isConnected && imagensOff.length > 0 ? (
+            {!isConnect && imagensOff.length > 0 ? (
               <Button variant="primary" onPress={() => setModal(MODAL.IMAGENS)}>
                 <Button.TextButton title={`Imagens(${imagensOff.length})`} />
               </Button>
@@ -927,19 +790,14 @@ export default function Autuacaoes() {
             </View>
 
             {/* Salvar */}
-            {isConnected ? (
-              <Button variant="primary" onPress={() => postAutuacao()}>
-                <Button.TextButton title="SALVAR" />
+            {isConnect ? (
+              <Button variant="primary" onPress={() => postViolation()}>
+                <Button.TextButton title="ENVIAR" />
               </Button>
             ) : (
-              <View className="gap-4">
-                <Button variant="primary" onPress={() => addAutuacao()}>
-                  <Button.TextButton title="SALVAR OFFLINE" />
-                </Button>
-                {/* <Button variant="primary" onPress={() => deleteDataAutuacao()}>
-                  <Button.TextButton title="DELETAR AUTUAÇÕES" />
-                </Button> */}
-              </View>
+              <Button variant="primary" onPress={() => addViolation()}>
+                <Button.TextButton title="SALVAR" />
+              </Button>
             )}
           </View>
         </ScrollView>
@@ -951,10 +809,10 @@ export default function Autuacaoes() {
         >
           <View className="flex-1">
             <FlatList
-              data={isConnected ? imagens : imagensOff}
+              data={isConnect ? imagens : imagensOff}
               renderItem={({ item, index }) => (
                 <View className="w-full mb-4 bg-white p-2 rounded-md border-gray-300 border-2">
-                  {isConnected ? (
+                  {isConnect ? (
                     <Image
                       className="h-56 rounded-md"
                       source={{ uri: item.uri }}

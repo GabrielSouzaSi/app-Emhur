@@ -31,10 +31,8 @@ export default function IdAutuacao() {
       setIsLoaded(true);
       const { data } = await server.get(`/violation/show/${id}`);
       const { vehicle_id, violation } = data;
-      console.log(violation);
 
       const arr = JSON.parse(violation.attachments);
-      console.log(arr);
       setImg(arr)
 
       setApproach(data.violation.approach.name);
@@ -54,9 +52,6 @@ export default function IdAutuacao() {
   useEffect(() => {
     getViolationCode();
   }, []);
-  useEffect(() => {
-    console.log(img);
-  }, [img]);
   return (
     <View>
       {/* Cabeçalho */}

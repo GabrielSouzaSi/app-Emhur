@@ -1,23 +1,13 @@
 import { Stack } from 'expo-router';
+import { NetworkProvider } from '@/contexts/NetworkContext';
 
 const FiscalLayout = () => {
 
 	return (
-		<Stack screenOptions={{ headerShown: false }}>
-		  <Stack.Screen name="index" />
-		  <Stack.Screen name="autuacoes" />
-		  <Stack.Screen name="inspection/[id]" />
-		  <Stack.Screen name="[id]" />
-		  <Stack.Screen name="consultarVistoria" />
-		  <Stack.Screen name="credencial" />
-		  <Stack.Screen name="escala" />
-		  <Stack.Screen name="historicoAutuacoes" />
-		  <Stack.Screen name="menuFiscalizacao" />
-		  <Stack.Screen name="menuVistoria" />
-		  <Stack.Screen name="veiculo" />
-		  <Stack.Screen name="vistoria" />
-		</Stack>
-	  );
+		<NetworkProvider>
+			<Stack screenOptions={{ headerShown: false }} />
+		</NetworkProvider>
+	);
 };
 
 export default FiscalLayout;

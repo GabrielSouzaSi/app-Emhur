@@ -1,12 +1,9 @@
-// schema da tabela Products
-
 // comando para gerar a tabela
 // npx drizzle-kit generate
 
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-export const infracao = sqliteTable("infracoes", {
+export const inspectionLocations = sqliteTable("inspectionLocations", {
     id: integer("id").primaryKey(),
-    code: text("code"),
-    description: text("description")
+    name: text("name")
 })

@@ -6,7 +6,7 @@
 import { sql } from "drizzle-orm";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-export const autuacao = sqliteTable("autuacoes", {
+export const violations = sqliteTable("violations", {
     id: integer("id").primaryKey(),
     vehicle: text("vehicle"), // placa ou numero
     imagens: text('imagens', { mode: 'json' })

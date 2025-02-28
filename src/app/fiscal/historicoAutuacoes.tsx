@@ -1,13 +1,7 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useContext } from "react";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Alert, Text, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-
-import { useSQLiteContext } from "expo-sqlite";
-import { drizzle } from "drizzle-orm/expo-sqlite";
-import * as autuacaoSchema from "@/database/schemas/autuacaoSchema";
-import * as infracaoSchema from "@/database/schemas/infracaoSchema";
-import * as approachSchema from "@/database/schemas/approachSchema";
 
 import { HeaderBack } from "@/components/headerBack";
 import { Button } from "@/components/button";
@@ -17,115 +11,49 @@ import { useAuth } from "@/hooks/useAuth";
 import { server } from "@/server/api";
 import { Loading } from "@/components/loading";
 import { Modal } from "@/components/modal";
-import { checkInternetConnection } from "@/utils/networkStatus";
-import { eq } from "drizzle-orm";
+import { delDatabaseViolationId, getDatabaseViolations } from "@/database/violation";
+import { NetworkContext } from "@/contexts/NetworkContext";
 
 enum MODAL {
   NONE = 0,
   OPTIONS = 1,
 }
 
-type ViolationCode = {
-  id: number;
-  code: string;
-  description: string;
-};
-type ApproachData = {
-  id: number;
-  name: string;
-};
-
 export default function HistoricoAutuacoes() {
+  const { isConnect } = useContext(NetworkContext);
+
   const [isLoaded, setIsLoaded] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [modal, setModal] = useState(MODAL.NONE);
   const { user } = useAuth();
-  const [violations, setViolations] = useState();
-  const [autuacoes, setAutuacoes] = useState<any>();
+  const [violations, setViolations] = useState<any>();
+  const [autuacoes, setAutuacoes] = useState([]);
   const [dBAutuacao, setDBAutuacao] = useState<any>();
 
-  const [isConnected, setIsConnected] = useState<any>();
-
-  const database = useSQLiteContext(); // acessando o banco de dados
-  const dbAutuacoes = drizzle(database, { schema: autuacaoSchema });
-  const dbInfracoes = drizzle(database, { schema: infracaoSchema });
-  const dbApproach = drizzle(database, { schema: approachSchema });
 
   const router = useRouter();
-  // Função para trazer os dados da tabela autuacoes
-  async function getAutuacoes() {
-    try {
-      const response = await dbAutuacoes.query.autuacao.findMany();
 
-      console.log("response => ", response);
-      setAutuacoes(response);
-    } catch (error) {
-      console.log(error);
-    } finally {
-      setIsLoaded(false);
-    }
-  }
-  // Função para trazer os dados da tabela infracoes
-  async function fetchInfracoes() {
-    try {
-      const response = await dbInfracoes.query.infracao.findMany();
-
-      console.log("response dbInfracoes => ", response);
-    } catch (error) {
-      console.log("fetchInfracoes =>" + error);
-    } finally {
-      setIsLoaded(false);
-    }
-  }
-  // Função para trazer os dados da tabela approach
-  async function fetchApproach() {
-    try {
-      const response = await dbApproach.query.approach.findMany();
-
-      console.log("dbApproach => ", response);
-    } catch (error) {
-      console.log("fetchInfracoes error =>" + error);
-    }
-  }
-  // Função para adicionar as insfrações no banco
-  async function addInfracoes(data: ViolationCode[]) {
-    try {
-      await dbInfracoes.delete(infracaoSchema.infracao).run();
-      await dbInfracoes.insert(infracaoSchema.infracao).values(data).run();
-
-      fetchInfracoes();
-    } catch (error) {
-      console.log("addInfracoes =>" + error);
-    }
-  }
-  // Função para adicionar os tipos de abordagem no banco
-  async function addApproach(data: ApproachData[]) {
-    try {
-      await dbInfracoes.delete(approachSchema.approach).run();
-      await dbInfracoes.insert(approachSchema.approach).values(data).run();
-
-      fetchApproach();
-    } catch (error) {
-      console.log("addApproach error =>" + error);
-    }
-  }
   // Função para visualizar a autuação selecionada
   const handleEdit = (item: any) => {
-    // console.log(item);
     router.push(`/fiscal/${item}`);
   };
-  // Função para abrir o modal de opções da autuação selecionada
+  // Abre o modal para exibir as opções da autuação selecionada
   const handleOption = (item: any) => {
+    console.log(item);
+
     setDBAutuacao(item);
     setModal(MODAL.OPTIONS);
   };
-
-  const handleSendAutuacao = async () => {
-    console.log(dBAutuacao);
+  // Envia a autuação pendênte
+  const sendViolationSelected = async () => {
+    setModal(MODAL.NONE);
+    setIsLoaded(true)
+    let currentdate = new Date();
+    let time = `${currentdate.getHours()}${currentdate.getMinutes()}${currentdate.getSeconds()}`
     try {
       const { data } = await server.get(`/vehicle/${dBAutuacao.vehicle}`);
       const formData = new FormData();
-      formData.append("auto_number", `auto_number`);
+      formData.append("auto_number", time.toString());
       formData.append("permit_holder_id", `${data.permit_holder_id.id}`);
       formData.append("user_id", `${user.id}`);
       formData.append("vehicle_id", `${data.vehicle_id.id}`);
@@ -149,31 +77,34 @@ export default function HistoricoAutuacoes() {
       console.log(formData);
 
       await server.postForm(`/violations`, formData);
+      await delDatabaseViolationId(dBAutuacao.id);
       Alert.alert("Sucesso", "Autuação enviado com sucesso!");
-      await dbAutuacoes
-        .delete(autuacaoSchema.autuacao)
-        .where(eq(autuacaoSchema.autuacao.id, dBAutuacao.id));
-      await getAutuacoes();
+      fetchViolations();
+      // Função para trazer os dados da tabela autuacoes
+      const response = await getDatabaseViolations();
+      setAutuacoes(response);
     } catch (error) {
       Alert.alert("Algo deu errado!", "Tente novamente!");
+    } finally {
+      setIsLoaded(false)
     }
   };
-
-  const handleDeleteAutuacao = async () => {
-    console.log(dBAutuacao);
+  // Deleta a autuação selecionada no banco
+  const delViolationSelected = async () => {
+    setModal(MODAL.NONE)
+    setIsLoaded(true)
     try {
-      await dbAutuacoes
-        .delete(autuacaoSchema.autuacao)
-        .where(eq(autuacaoSchema.autuacao.id, dBAutuacao.id));
+      await delDatabaseViolationId(dBAutuacao.id)
+      await getViolations();
       Alert.alert("Aviso!", "Autuação excluída com sucesso!");
-      await getAutuacoes();
     } catch (error) {
       Alert.alert("Algo deu errado!", "Tente novamente!");
+    } finally {
+      setIsLoaded(false)
     }
   };
-
-  // Função para receber as autuações do fiscal
-  async function getViolations() {
+  // Função para receber as autuações do fiscal logado
+  async function fetchViolations() {
     try {
       setIsLoaded(true);
       const { data } = await server.get(`/agent/${user.id}/violations`);
@@ -182,54 +113,30 @@ export default function HistoricoAutuacoes() {
     } catch (error) {
       throw error;
     } finally {
-      getAutuacoes();
+      // Consulta as autuações no bando
+      const response = await getDatabaseViolations();
+      setAutuacoes(response);
+      setIsLoaded(false);
     }
   }
-  // Função para receber o código das autuações
-  async function getViolationsCode() {
+  // Função para buscar as autuações no banco
+  async function getViolations() {
+    setIsLoaded(true);
     try {
-      const { data } = await server.get(`/violations-code`);
-      // console.log("violations => ", data);
-      const violationsCodeData = await data.map((item: ViolationCode) => {
-        return {
-          id: item.id,
-          code: item.code,
-          description: item.description,
-        };
-      });
-      addInfracoes(violationsCodeData);
+      // Consulta as autuações no bando
+      const response = await getDatabaseViolations();
+      setAutuacoes(response);
     } catch (error) {
-      throw error;
-    }
-  }
-  async function getApproach() {
-    try {
-      const { data } = await server.get(`/vehicle/1`);
-      const { approach } = data;
-      addApproach(approach);
-    } catch (error) {
+      setIsLoaded(false);
       throw error;
     } finally {
       setIsLoaded(false);
     }
   }
-  //função checkInternetConnection para verificar o status de conexão
-  const checkConnection = async () => {
-    const connected = await checkInternetConnection();
-    console.log(connected);
-    setIsConnected(connected);
-    return connected;
-  };
 
-  // Chama a função checkInternetConnection ao entrar na tela
   useFocusEffect(
     useCallback(() => {
       setIsFocused(true); // Está focado.
-      const result = async () => {
-        let res = await checkConnection();
-        res ? getViolations() : getAutuacoes();
-      };
-      result();
       return () => {
         setIsFocused(false); // Não está focado.
       };
@@ -237,19 +144,8 @@ export default function HistoricoAutuacoes() {
   );
   // Verifica a conexão
   useEffect(() => {
-    if (isFocused) {
-      const intervalId = setInterval(checkConnection, 10000); // Configura o intervalo de 10 segundos
-      return () => clearInterval(intervalId);
-    }
-  }, [isFocused]);
-
-  useEffect(() => {
-    if (isConnected && isFocused) {
-      console.log("Codigo de violação!");
-      getViolationsCode();
-      getApproach();
-    }
-  }, [isConnected, isFocused]);
+    isConnect && isFocused ? fetchViolations() : getViolations()
+  }, [isConnect, isFocused])
 
   return (
     <View className="flex-1">
@@ -259,39 +155,52 @@ export default function HistoricoAutuacoes() {
         <MaterialCommunityIcons
           name="circle"
           size={24}
-          color={isConnected ? "green" : "red"}
+          color={isConnect ? "green" : "red"}
         />
       </View>
-      {violations ? (
+      {autuacoes[0] ? (
         <View className="mx-4">
           <Text className="text-gray-500 font-regular text-2xl font-bold">
-            Autuações Pendentes:
+            Autuações Pendentes ({autuacoes.length}):
           </Text>
         </View>
       ) : (
-        <></>
+        <View className="mx-4 mb-4 bg-white border-2 rounded-md border-gray-300">
+          <View className="border-b-2 border-gray-300">
+            <Text className="ml-2 my-2 text-gray-500 font-regular text-2xl font-bold">
+              Aviso!
+            </Text>
+          </View>
+          <View className="justify-center items-center">
+            <Text className="my-4 text-gray-500 font-regular text-base font-bold">
+              Sem pendência local.
+            </Text>
+          </View>
+        </View>
       )}
 
-      {autuacoes ? (
+      {autuacoes[0] ? (
         <DataTableOff data={autuacoes} onSend={handleOption} />
       ) : (
         <></>
       )}
-      {violations ? (
+      {violations && isConnect ? (
         <View className="mx-4">
           <Text className="text-gray-500 font-regular text-2xl font-bold">
-            Autuações Enviadas:
+            Autuações Enviadas ({violations.length}):
           </Text>
         </View>
       ) : (
         <></>
       )}
-      {violations ? <DataTable data={violations} onEdit={handleEdit} /> : <></>}
+      {violations && isConnect ? <DataTable data={violations} onEdit={handleEdit} /> : <></>}
+
       <View className="m-4">
-        <Button variant="primary" onPress={() => router.push("/fiscal/autuacoes")}>
+        <Button variant="primary" onPress={() => router.push("/fiscal/violation")}>
           <Button.TextButton title="Cadastrar Autuação" />
         </Button>
       </View>
+
       <Modal
         className="bg-gray-200"
         variant="primary"
@@ -300,15 +209,16 @@ export default function HistoricoAutuacoes() {
       >
         <View className="flex-1 justify-center">
           <View className="gap-5">
-            <Button variant="primary" onPress={() => handleSendAutuacao()}>
+            <Button variant="primary" onPress={() => sendViolationSelected()}>
               <Button.TextButton title="Enviar" />
             </Button>
-            <Button variant="primary" onPress={() => handleDeleteAutuacao()}>
+            <Button variant="primary" onPress={() => delViolationSelected()}>
               <Button.TextButton title="Excluir" />
             </Button>
           </View>
         </View>
       </Modal>
+      {isLoaded ? <Loading /> : <></>}
     </View>
   );
 }
