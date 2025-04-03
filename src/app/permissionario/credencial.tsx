@@ -1,12 +1,11 @@
 import { View } from "react-native";
 import { HeaderBack } from "@/components/headerBack";
 
-export default function ConsultarVistoria() {
+export default function CredencialPermissionario() {
   return (
     <View>
       <HeaderBack
-        title="Consultar Vistoria"
-        variant="primary"
+        title="Credencial"
       />
     </View>
   );

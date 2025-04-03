@@ -27,7 +27,7 @@ SplashScreen.preventAutoHideAsync();
 
 function StackLayout() {
   const { success, error } = useMigrations(db, migrations);
-  useDrizzleStudio(expoDb)
+  useDrizzleStudio(expoDb);
   const { user } = useAuth();
   const router = useRouter();
 
@@ -45,14 +45,15 @@ function StackLayout() {
   useEffect(() => {
     // console.log("authState", user);
     // console.log(isFontLoaded, success);
-    if (isFontLoaded && success) {
-      if (!user?.id) {
-        console.log("===Login===");
-        router.replace("/");
-      } else if (user?.id) {
-        console.log("===Fiscal===");
-        router.replace("/fiscal");
-      }
+    // if (isFontLoaded && success) {
+    //   router.replace("/permissionario");
+    if (!user?.id) {
+      console.log("===Login===");
+      router.replace("/");
+    } else if (user?.id) {
+      console.log("===Permit===");
+      router.replace("/permissionario");
+      return;
     } else {
       return;
     }
@@ -68,7 +69,7 @@ function StackLayout() {
       {isFontLoaded ? (
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
-          <Stack.Screen name="fiscal" />
+          <Stack.Screen name="permissionario" />
         </Stack>
       ) : (
         <Loading />

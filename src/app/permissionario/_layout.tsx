@@ -1,13 +1,15 @@
 import { Stack } from 'expo-router';
 import { NetworkProvider } from '@/contexts/NetworkContext';
 
-const FiscalLayout = () => {
+const PermitLayout = () => {
 
 	return (
 		<NetworkProvider>
-			<Stack screenOptions={{ headerShown: false }} />
+			<Stack screenOptions={{ headerShown: false }}>
+				<Stack.Screen name="index" />
+			</Stack>
 		</NetworkProvider>
 	);
 };
 
-export default FiscalLayout;
+export default PermitLayout;

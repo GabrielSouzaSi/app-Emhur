@@ -26,9 +26,10 @@ export function HeaderMenu( ) {
       className="bg-white w-full flex flex-row justify-between items-center py-3 px-5 mb-5"
       style={styles.shadow}
     >
-      <Image className="w-12 h-12" source={require("@/assets/app-fiscal.png")} />
+      {/* <Image className="w-12 h-12" source={require("@/assets/app-fiscal.png")} /> */}
+      <View />
       <TouchableOpacity onPress={() => handleSignOut()}>
-        <MaterialCommunityIcons name="logout" size={30} color={colors.blue[500]} />
+        <MaterialCommunityIcons name="logout" size={30} color={colors.green[500]} />
       </TouchableOpacity>
     </View>
   );

@@ -46,7 +46,7 @@ export default function Login() {
 
       <View className="flex-1 p-8 justify-center">
         <View className="items-center mb-10">
-        <Image className="w-48 h-48" source={require("@/assets/adaptive-icon.png")} />
+        
         </View>
 
         <View>
@@ -99,12 +99,12 @@ export default function Login() {
         </View>
 
         <Pressable className="my-7 items-end">
-          <Text className="font-regular font-bold text-base text-blue-500">
+          <Text className="font-regular font-bold text-base text-green-500">
             Esqueceu a senha?
           </Text>
         </Pressable>
 
-        <Button variant="primary" onPress={handleSubmit(handleSignIn)}>
+        <Button onPress={handleSubmit(handleSignIn)}>
           <Button.TextButton title="Entrar" />
         </Button>
       </View>

@@ -10,7 +10,7 @@ export function Header({ title }: Props) {
       className="bg-white w-full flex-row items-center justify-center py-3"
       style={styles.shadow}
     >
-      <Text className="text-blue-500 font-regular text-2xl font-bold">
+      <Text className="text-green-500 font-regular text-2xl font-bold">
         {title}
       </Text>
     </View>
