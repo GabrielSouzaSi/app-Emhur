@@ -48,8 +48,7 @@ type ListCod = {
 };
 
 export default function Autuacaoes() {
-
-  const { isConnect } = useContext(NetworkContext)
+  const { isConnect } = useContext(NetworkContext);
 
   // informação do usuário
   const { user } = useAuth();
@@ -196,7 +195,7 @@ export default function Autuacaoes() {
     setIsLoaded(true);
     let status = await statusGPS();
     if (status) {
-      let loc: Location.LocationObject = status
+      let loc: Location.LocationObject = status;
       let currentdate = new Date();
       let date =
         +currentdate.getFullYear() +
@@ -255,7 +254,7 @@ export default function Autuacaoes() {
     setIsLoaded(true);
     let status = await statusGPS();
     if (status) {
-      let loc: Location.LocationObject = status
+      let loc: Location.LocationObject = status;
 
       let currentdate = new Date();
       let date =
@@ -271,7 +270,7 @@ export default function Autuacaoes() {
         currentdate.getMinutes() +
         ":" +
         currentdate.getSeconds();
-        
+
       const data = [
         {
           vehicle: numero, // placa ou numero
@@ -338,8 +337,8 @@ export default function Autuacaoes() {
   // Função para tirar foto
   const takePhoto = async () => {
     const pickerResult = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
+      mediaTypes: ["images"],
+      allowsEditing: false,
       aspect: [4, 2],
       quality: 1,
     });
@@ -374,11 +373,7 @@ export default function Autuacaoes() {
       let album = await MediaLibrary.getAlbumAsync("EmhurFiscal");
 
       if (!album) {
-        album = await MediaLibrary.createAlbumAsync(
-          "appFiscal",
-          asset,
-          false
-        );
+        album = await MediaLibrary.createAlbumAsync("appFiscal", asset, false);
         alert("Imagem salva com sucesso!");
       } else {
         await MediaLibrary.addAssetsToAlbumAsync([asset], album.id, false);
@@ -403,7 +398,7 @@ export default function Autuacaoes() {
   const pickImage = async () => {
     // Abrir seletor de imagem
     let pickerResult = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [4, 2],
       quality: 1,
@@ -444,23 +439,25 @@ export default function Autuacaoes() {
   // Solicitar permissão
   async function getPermissionGPS() {
     const { status } = await Location.requestForegroundPermissionsAsync();
-    
+
     if (status !== "granted") {
-      Alert.alert("Permissão negada", "Dê permissão da localização para continuar.", [
-        { text: "OK", onPress: () => getPermissionGPS() },
-      ]);
+      Alert.alert(
+        "Permissão negada",
+        "Dê permissão da localização para continuar.",
+        [{ text: "OK", onPress: () => getPermissionGPS() }]
+      );
       return;
     } else {
-      await statusGPS()
+      await statusGPS();
     }
   }
   // Verificar se o GPS está ativado
   async function statusGPS() {
-    const isGPSEnabled = await Location.hasServicesEnabledAsync();    
+    const isGPSEnabled = await Location.hasServicesEnabledAsync();
 
     if (!isGPSEnabled) {
       Alert.alert("GPS desativado", "Ative o GPS para capturar a localização.");
-      return false
+      return false;
     } else {
       // Capturar localização
       const userLocation = await Location.getCurrentPositionAsync({
@@ -492,7 +489,9 @@ export default function Autuacaoes() {
                   variant="primary"
                   placeholder="placa ou número"
                   onChangeText={setNumero}
-                  onSubmitEditing={() => isConnect ? searchPlate(numero) : Keyboard.dismiss()}
+                  onSubmitEditing={() =>
+                    isConnect ? searchPlate(numero) : Keyboard.dismiss()
+                  }
                   returnKeyType="send"
                 />
               </View>
