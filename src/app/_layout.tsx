@@ -43,17 +43,16 @@ function StackLayout() {
   // console.log("isFontLoaded => ", isFontLoaded);
 
   useEffect(() => {
-    // console.log("authState", user);
-    // console.log(isFontLoaded, success);
-    // if (isFontLoaded && success) {
-    //   router.replace("/permissionario");
-    if (!user?.id) {
-      console.log("===Login===");
-      router.replace("/");
-    } else if (user?.id) {
-      console.log("===Permit===");
-      router.replace("/permissionario");
-      return;
+    console.log("User data => ", user);
+
+    if (isFontLoaded && success) {
+      if (!user?.id) {
+        console.log("===Login===");
+        router.replace("/");
+      } else if (user?.id) {
+        console.log("===Fiscal===");
+        router.replace("/permissionario");
+      }
     } else {
       return;
     }
