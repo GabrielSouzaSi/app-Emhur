@@ -307,8 +307,9 @@ export default function Autuacaoes() {
   // filtra a pesquisa do usuário
   function filter(text: string) {
     if (text) {
+      const lowerText = text.toLowerCase();
       let filtered = codigo?.filter((item: ListCod) =>
-        item.description.includes(text)
+        item.description.toLowerCase().includes(lowerText)
       );
       if (filtered.length == 0) {
         setSelecText([{ id: 1000, description: "Sem resultados!" }]);
@@ -833,32 +834,46 @@ export default function Autuacaoes() {
             />
           </View>
         </Modal>
-        <Modal
-          variant="primary"
+        <RNModal
           visible={modal === MODAL.INFRACAO}
-          onClose={() => setModal(MODAL.NONE)}
+          animationType="slide"
+          onRequestClose={() => setModal(MODAL.NONE)}
         >
-          <Field
-            className="mb-4"
-            placeholder="Código da Infração"
-            variant="primary"
-            onChangeText={(text) => filter(text)}
-          />
-          <FlatList
-            data={selecText}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                className="bg-gray-300 rounded-md p-2 my-4"
-                onPress={() => onSelectData(item)}
-              >
-                <Text className="text-lg font-medium">{item.description}</Text>
-              </TouchableOpacity>
-            )}
-            horizontal={false}
-            scrollEnabled={true}
-            showsVerticalScrollIndicator={false}
-          />
-        </Modal>
+          <View className="flex-1 bg-white p-4">
+            <TouchableOpacity
+              activeOpacity={0.7}
+              className="self-end mb-4"
+              onPress={() => setModal(MODAL.NONE)}
+            >
+              <MaterialCommunityIcons
+                name="close-circle-outline"
+                size={30}
+                color="#008dd0"
+              />
+            </TouchableOpacity>
+            <Field
+              placeholder="Código da Infração"
+              variant="primary"
+              onChangeText={(text) => filter(text)}
+            />
+            <FlatList
+              data={selecText}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  className="bg-gray-300 rounded-md p-2 my-3"
+                  onPress={() => onSelectData(item)}
+                >
+                  <Text className="text-lg font-medium">
+                    {item.description}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              horizontal={false}
+              scrollEnabled={true}
+              showsVerticalScrollIndicator={false}
+            />
+          </View>
+        </RNModal>
         <RNModal visible={modal === MODAL.QR} className="flex-1">
           <CameraView
             style={{ flex: 1 }}
