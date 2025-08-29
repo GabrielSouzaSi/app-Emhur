@@ -47,7 +47,7 @@ export default function Vistoria() {
 
   const router = useRouter();
 
-  const { isConnect } = useContext(NetworkContext)
+  const { isConnect } = useContext(NetworkContext);
 
   const { user } = useAuth();
 
@@ -212,27 +212,10 @@ export default function Vistoria() {
     }
   };
 
-  // Funação para ter acesso a camera
-  const askCameraPermission = async () => {
-    // Solicitar permissão para usar a câmera
-    const { status: cameraStatus } =
-      await ImagePicker.requestCameraPermissionsAsync();
-    // Solicitar permissão para salvar a imagem no álbum
-    const { status: mediaLibraryStatus } =
-      await MediaLibrary.requestPermissionsAsync();
-    if (cameraStatus !== "granted" || mediaLibraryStatus !== "granted") {
-      alert(
-        "Desculpe, precisamos das permissões da câmera e do álbum para isso funcionar!"
-      );
-      return;
-    }
-  };
-
   // Função para tirar foto
   const takePhoto = async () => {
-    await askCameraPermission();
     const pickerResult = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [4, 2],
       quality: 1,
@@ -245,7 +228,7 @@ export default function Vistoria() {
         type: "image/jpeg",
       };
       setImagens([...imagens, img]);
-      if (!isConnect) saveImage(img.uri)
+      if (!isConnect) saveImage(img.uri);
     }
   };
 
@@ -269,11 +252,7 @@ export default function Vistoria() {
       let album = await MediaLibrary.getAlbumAsync("appFiscal");
 
       if (!album) {
-        album = await MediaLibrary.createAlbumAsync(
-          "appFiscal",
-          asset,
-          false
-        );
+        album = await MediaLibrary.createAlbumAsync("appFiscal", asset, false);
         alert("Imagem salva com sucesso!");
       } else {
         await MediaLibrary.addAssetsToAlbumAsync([asset], album.id, false);
@@ -288,19 +267,14 @@ export default function Vistoria() {
 
       setImagensOff([...imagensOff, img[0].uri]);
     } catch (error) {
-      console.log(error);
       alert("Erro ao salvar a imagem!");
     }
   };
 
   // Função para selecinar imagem da galeria
   const pickImage = async () => {
-    await askPermission(
-      "Precisamos da permissão do rolo da câmera para ler as fotos do seu telefone..."
-    );
-
     let pickerResult = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [4, 2],
       quality: 1,
@@ -313,7 +287,9 @@ export default function Vistoria() {
         name: new Date().getTime() + ".jpeg",
         type: "image/jpeg",
       };
-      isConnect ? setImagens([...imagens, img]) : setImagensOff([...imagensOff, img.uri]);
+      isConnect
+        ? setImagens([...imagens, img])
+        : setImagensOff([...imagensOff, img.uri]);
     }
   };
 
@@ -334,7 +310,7 @@ export default function Vistoria() {
   };
 
   async function postInspection() {
-    setIsLoaded(true)
+    setIsLoaded(true);
     let currentdate = new Date();
     let date =
       +currentdate.getFullYear() +
@@ -376,14 +352,16 @@ export default function Vistoria() {
     try {
       await server.postForm(`/inspections`, data);
       setIsLoaded(false);
-      Alert.alert("Sucesso", "Vistoria enviado com sucesso!", [{ text: "OK", onPress: () => router.back() }]);
+      Alert.alert("Sucesso", "Vistoria enviado com sucesso!", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
     } catch (error) {
-      setIsLoaded(false)
+      setIsLoaded(false);
       console.log(error);
-    } 
+    }
   }
   async function addInspection() {
-    setIsLoaded(true)
+    setIsLoaded(true);
     let currentdate = new Date();
     let date =
       +currentdate.getFullYear() +
@@ -411,16 +389,18 @@ export default function Vistoria() {
         obs: obs,
         items: JSON.stringify(formData),
         imagens: imagensOff,
-        status: "pendente"
+        status: "pendente",
       },
     ];
 
     try {
       await addDatabaseInspection(inspection);
       setIsLoaded(false);
-      Alert.alert("Sucesso", "Vistoria salvo com sucesso!", [{ text: "OK", onPress: () => router.back() }]);
+      Alert.alert("Sucesso", "Vistoria salvo com sucesso!", [
+        { text: "OK", onPress: () => router.back() },
+      ]);
     } catch (error) {
-      setIsLoaded(false)
+      setIsLoaded(false);
       console.log(error);
     }
   }
@@ -580,7 +560,6 @@ export default function Vistoria() {
               <></>
             )}
 
-
             <View className="mb-4">
               <Text className="mb-4 text-gray-500 font-regular text-2xl font-bold">
                 Motivo da Vistoria
@@ -657,7 +636,6 @@ export default function Vistoria() {
               />
             </View>
 
-
             {/* Salvar */}
             {isConnect ? (
               <Button variant="primary" onPress={() => postInspection()}>
@@ -681,7 +659,14 @@ export default function Vistoria() {
               data={isConnect ? imagens : imagensOff}
               renderItem={({ item, index }) => (
                 <View className="w-full mb-4 bg-white p-2 rounded-md border-gray-300 border-2">
-                  <Image className="h-56 rounded-md" source={{ uri: item }} />
+                  {isConnect ? (
+                    <Image
+                      className="h-56 rounded-md"
+                      source={{ uri: item.uri }}
+                    />
+                  ) : (
+                    <Image className="h-56 rounded-md" source={{ uri: item }} />
+                  )}
                   <Pressable
                     className="py-4 items-center"
                     onPress={() => removerImagem(index)}

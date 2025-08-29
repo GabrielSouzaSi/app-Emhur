@@ -1,23 +1,31 @@
-import React, { createContext, useState, useEffect } from 'react';
-import NetInfo from '@react-native-community/netinfo';
+import React, { createContext, useState, useEffect } from "react";
+import NetInfo, { NetInfoState } from "@react-native-community/netinfo";
 
 export type NetworkContextDataProps = {
-  isConnect: boolean
+  isConnect: boolean | null; // null = ainda não sabe
 };
 
-// Criando o contexto
-export const NetworkContext = createContext<NetworkContextDataProps>({} as NetworkContextDataProps);
+export const NetworkContext = createContext<NetworkContextDataProps>({
+  isConnect: null,
+});
 
-// Componente para prover as informações de rede
-export const NetworkProvider = ({ children }) => {
-  const [isConnect, setIsConnect] = useState(true);
+type Props = { children: React.ReactNode };
+
+export const NetworkProvider = ({ children }: Props) => {
+  const [isConnect, setIsConnect] = useState<boolean | null>(null);
 
   useEffect(() => {
+    const computeReachable = (state: NetInfoState) =>
+      state.isConnected === true && (state.isInternetReachable ?? true); // se for null no 1º tick, tratamos como true para não travar
+
+    // leitura inicial (evita piscar como online ao abrir offline)
+    NetInfo.fetch().then((state) => setIsConnect(computeReachable(state)));
+
+    // assinante para mudanças
     const unsubscribe = NetInfo.addEventListener((state) => {
-      setIsConnect(state.isConnected);
+      setIsConnect(computeReachable(state));
     });
 
-    // Cleanup quando o componente for desmontado
     return () => unsubscribe();
   }, []);
 

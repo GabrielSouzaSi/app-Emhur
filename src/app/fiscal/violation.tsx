@@ -371,7 +371,7 @@ export default function Autuacaoes() {
       const asset = await MediaLibrary.createAssetAsync(uri);
 
       // Verificar se o álbum já existe
-      let album = await MediaLibrary.getAlbumAsync("EmhurFiscal");
+      let album = await MediaLibrary.getAlbumAsync("appFiscal");
 
       if (!album) {
         album = await MediaLibrary.createAlbumAsync("appFiscal", asset, false);
@@ -390,7 +390,6 @@ export default function Autuacaoes() {
       console.log(img[0].uri);
       setImagensOff([...imagensOff, img[0].uri]);
     } catch (error) {
-      console.log(error);
       alert("Erro ao salvar a imagem!");
     }
   };
@@ -913,8 +912,8 @@ export default function Autuacaoes() {
             returnKeyType="send"
           />
         </Modal>
-        {isLoaded ? <Loading /> : <></>}
       </View>
+      {isLoaded ? <Loading /> : <></>}
     </>
   );
 }

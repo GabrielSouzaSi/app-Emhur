@@ -5,6 +5,7 @@ import { Alert, FlatList, View } from "react-native";
 import { HeaderMenu } from "@/components/headerMenu";
 import { MenuCard } from "@/components/menuCard";
 import { server } from "@/server/api";
+import { handleRequestError, registerSetIsLoaded } from "@/utils/errorHandler";
 
 import { NetworkContext } from "@/contexts/NetworkContext";
 import { delDatabaseReason } from "@/database/reason";
@@ -40,12 +41,12 @@ export default function HomeFiscal() {
 
   const menuItems: MenuItem[] = [
     {
-      title: "Fiscalização",
+      title: "Autuações",
       icon: "shield-account-outline",
-      route: "/fiscal/menuFiscalizacao",
+      route: "/fiscal/historicoAutuacoes",
     },
     {
-      title: "Vistoria",
+      title: "Vistorias",
       icon: "checkbox-outline",
       route: "/fiscal/menuVistoria",
     },
@@ -54,25 +55,28 @@ export default function HomeFiscal() {
       icon: "car-outline",
       route: "/fiscal/veiculo",
     },
-    {
-      title: "Frequência",
-      icon: "calendar-outline",
-      route: "/fiscal/frequency",
-    },
+    // {
+    //   title: "Frequência",
+    //   icon: "calendar-outline",
+    //   route: "/fiscal/frequency",
+    // },
   ];
 
   function isMenuItemBase(item: MenuItem): item is MenuItemBase {
     return !("empty" in item);
   }
 
-  // Preenche a lista com espaços em branco até múltiplos de 3
+  // Preenche a lista com espaços em branco
+  const COLUMNS = 2;
+
   const fillMenu = (): MenuItem[] => {
-    const remainder = menuItems.length % 3;
+    const remainder = menuItems.length % COLUMNS;
     if (remainder === 0) return menuItems;
 
-    const fillers: MenuItem[] = Array.from({ length: 3 - remainder }, () => ({
-      empty: true,
-    }));
+    const fillers: MenuItem[] = Array.from(
+      { length: COLUMNS - remainder },
+      () => ({ empty: true })
+    );
 
     return [...menuItems, ...fillers];
   };
@@ -83,11 +87,13 @@ export default function HomeFiscal() {
     try {
       const { data } = await server.get(`/inspection-reasons-all`);
       // Função para adicionar no banco os motivos da vistoria
-      delDatabaseReason(data);
-      getViolationsCode();
+      await delDatabaseReason(data);
+      await getViolationsCode();
     } catch (error) {
-      setIsLoaded(false);
-      throw error;
+      handleRequestError(
+        "Não foi possível carregar os motivos da vistoria. Tente novamente.",
+        error
+      );
     }
   }
 
@@ -96,7 +102,7 @@ export default function HomeFiscal() {
     try {
       const { data } = await server.get(`/violations-code`);
       // console.log("violations => ", data);
-      const violationsCodeData = await data.map((item: ViolationCode) => {
+      const violationsCodeData = data.map((item: ViolationCode) => {
         return {
           id: item.id,
           code: item.code,
@@ -104,11 +110,13 @@ export default function HomeFiscal() {
         };
       });
       // Remover e adicionar no banco os codigos de autuação
-      delDatabaseViolationCode(violationsCodeData);
-      getApproach();
+      await delDatabaseViolationCode(violationsCodeData);
+      await getApproach();
     } catch (error) {
-      setIsLoaded(false);
-      throw error;
+      handleRequestError(
+        "Não foi possível carregar os códigos de autuação. Tente novamente.",
+        error
+      );
     }
   }
   // Função para receber o modo de abordagem
@@ -117,10 +125,12 @@ export default function HomeFiscal() {
       const { data } = await server.get(`/vehicle/1`);
       const { approach } = data;
       await delDatabaseApproach(approach);
-      getInspectionLocations();
+      await getInspectionLocations();
     } catch (error) {
-      setIsLoaded(false);
-      throw error;
+      handleRequestError(
+        "Não foi possível carregar o modo de abordagem. Tente novamente.",
+        error
+      );
     }
   }
   // Função para buscar a lista dos locais da vistoria
@@ -129,17 +139,28 @@ export default function HomeFiscal() {
       const { data } = await server.get("/inspection-locations");
       await delDatabaseInspectionLocation(data);
     } catch (error) {
-      setIsLoaded(false);
-      console.log(error);
+      handleRequestError(
+        "Não foi possível carregar os locais de vistoria. Tente novamente.",
+        error
+      );
     } finally {
       setIsLoaded(false);
     }
   }
 
+  // Verifica a conexão
   useEffect(() => {
-    isConnect
-      ? getInspectionReasons()
-      : Alert.alert("Aviso!", "Você não está conectado.");
+    if (isConnect === null) return; // ainda calculando
+    if (isConnect === true) {
+      getInspectionReasons();
+    } else {
+      Alert.alert("Aviso!", "Você não está conectado.");
+      setIsLoaded(false);
+    }
+  }, [isConnect]);
+
+  useEffect(() => {
+    registerSetIsLoaded(setIsLoaded);
   }, []);
 
   return (
@@ -148,7 +169,7 @@ export default function HomeFiscal() {
 
       <FlatList
         data={fillMenu()}
-        numColumns={3}
+        numColumns={COLUMNS}
         keyExtractor={(_, index) => index.toString()}
         contentContainerStyle={{ paddingHorizontal: 20 }}
         columnWrapperStyle={{
@@ -164,7 +185,7 @@ export default function HomeFiscal() {
               variant="primary"
             />
           ) : (
-            <View style={{ flex: 1, margin: 4 }} />
+            <View className="flex-1 bg-transparent py-5 m-2" />
           )
         }
       />
