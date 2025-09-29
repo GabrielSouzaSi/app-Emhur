@@ -7,7 +7,10 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "test": "jest --watchAll"
+    "test": "jest --watchAll",
+    "bump": "node bump-version.js",
+    "bump:minor": "node bump-version.js minor",
+    "bump:major": "node bump-version.js major"
   },
   "jest": {
     "preset": "jest-expo"
