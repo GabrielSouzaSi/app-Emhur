@@ -12,6 +12,7 @@ import {
   Modal as RNModal,
   Keyboard,
 } from "react-native";
+import colors from "tailwindcss/colors";
 import * as Location from "expo-location";
 
 import * as ImagePicker from "expo-image-picker";
@@ -58,7 +59,6 @@ export default function Autuacaoes() {
 
   const [codeQr, setCodeQr] = useState("");
 
-  const [autuacao, setAutuacao] = useState<Data[]>([]);
   const router = useRouter();
 
   // Mode de Abordagem
@@ -81,8 +81,8 @@ export default function Autuacaoes() {
 
   // Dados da Infração
   const [local, setLocal] = useState("");
-  const [idInfracao, setIdInfracao] = useState<number>();
-  const [textCod, setTextCod] = useState("");
+  const [idInfracao, setIdInfracao] = useState<number[]>([]);
+  const [textCod, setTextCod] = useState<string[]>([]);
   const [obs, setObs] = useState("");
 
   // Dados do Condutor/Infrator
@@ -217,7 +217,9 @@ export default function Autuacaoes() {
       formData.append("user_id", `${user.id}`);
       formData.append("vehicle_id", `${vehicle?.id}`);
       formData.append("approach_id", `${abordagem}`);
-      formData.append("violation_code_id", `${idInfracao}`);
+      idInfracao.forEach((id) => {
+        formData.append("violation_code_id[]", id.toString());
+      });
       formData.append("violation_date", date);
       formData.append("violation_time", time);
       formData.append("latitude", `${loc.coords.latitude}`);
@@ -232,10 +234,10 @@ export default function Autuacaoes() {
           type: "image/jpeg",
         } as any);
       });
-      formData.append("appeal_end_date", "2024-08-26");
+      formData.append("appeal_end_date", "2024-10-1");
 
       try {
-        await server.postForm(`/violations`, formData);
+        //await server.postForm(`/violations`, formData);
         Alert.alert("Sucesso", "Autuação enviado com sucesso!", [
           { text: "OK", onPress: () => router.back() },
         ]);
@@ -281,7 +283,7 @@ export default function Autuacaoes() {
           data: date,
           hora: time,
           approach: `${abordagem}`,
-          idInfracao: `${idInfracao}`,
+          idInfracao: idInfracao,
           obs: obs,
           status: "Pendente",
         },
@@ -329,10 +331,17 @@ export default function Autuacaoes() {
   };
 
   // Função recebe o código da infração selecionada
+  // Função para marcar/desmarcar seleção
   function onSelectData(item: ListCod) {
-    setTextCod(item.description);
-    setIdInfracao(item.id);
-    setModal(MODAL.NONE);
+    if (idInfracao.includes(item.id)) {
+      // já está selecionado → remove
+      setIdInfracao((prev) => prev.filter((id) => id !== item.id));
+      setTextCod((prev) => prev.filter((desc) => desc !== item.description));
+    } else {
+      // ainda não está selecionado → adiciona
+      setIdInfracao([...idInfracao, item.id]);
+      setTextCod((prev) => [...prev, item.description]);
+    }
   }
 
   // Função para tirar foto
@@ -766,14 +775,32 @@ export default function Autuacaoes() {
               >
                 <Button.TextButton title="Código da Infração" />
               </Button>
-              {textCod ? (
-                <View className="bg-gray-300 rounded-md px-2 py-4 mt-4">
-                  <Text className="font-medium text-lg">{textCod}</Text>
-                </View>
-              ) : (
-                <></>
-              )}
             </View>
+
+            {/* Mostra os códigos selecionados */}
+            {textCod.length > 0 && (
+              <View className="bg-gray-300 rounded-md px-3 mt-4">
+                <Text className="my-4 text-gray-500 font-regular text-2xl font-bold">
+                  Códigos Selecionados:{" "}
+                  {idInfracao.length > 0 ? idInfracao.length : 0}
+                </Text>
+                <ScrollView
+                  style={{ height: 100 }} // altura fixa para a rolagem funcionar
+                  contentContainerStyle={{ paddingBottom: 50, gap: 10 }}
+                  showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled={true}
+                >
+                  {textCod.map((item) => (
+                    <View
+                      key={item}
+                      className="bg-white px-3 py-1 rounded-full border border-gray-400"
+                    >
+                      <Text className="text-sm font-medium">{item}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
 
             {/* Observação */}
             <View className="flex mb-5">
@@ -847,7 +874,7 @@ export default function Autuacaoes() {
               <MaterialCommunityIcons
                 name="close-circle-outline"
                 size={30}
-                color="#008dd0"
+                color={colors.blue[500]}
               />
             </TouchableOpacity>
             <Field
@@ -857,16 +884,25 @@ export default function Autuacaoes() {
             />
             <FlatList
               data={selecText}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  className="bg-gray-300 rounded-md p-2 my-3"
-                  onPress={() => onSelectData(item)}
-                >
-                  <Text className="text-lg font-medium">
-                    {item.description}
-                  </Text>
-                </TouchableOpacity>
-              )}
+              renderItem={({ item }) => {
+                const isSelected = idInfracao.includes(item.id);
+                return (
+                  <TouchableOpacity
+                    className={`rounded-md p-2 my-3 ${
+                      isSelected ? "bg-blue-500" : "bg-gray-300"
+                    }`}
+                    onPress={() => onSelectData(item)}
+                  >
+                    <Text
+                      className={`text-lg font-medium ${
+                        isSelected ? "text-white" : "text-black"
+                      }`}
+                    >
+                      {item.description}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }}
               horizontal={false}
               scrollEnabled={true}
               showsVerticalScrollIndicator={false}
