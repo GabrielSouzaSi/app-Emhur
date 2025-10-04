@@ -7,6 +7,8 @@ import {
   Image,
   Pressable,
   Alert,
+  Modal,
+  TouchableOpacity,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
@@ -24,11 +26,12 @@ import { DropdownButton } from "@/components/buttonDropdown";
 import { VehicleDTO } from "@/dtos/vehicleDTO";
 import { PermitHolderDTO } from "@/dtos/permitHolderDTO";
 import { InspectionItemDTO } from "@/dtos/inspectionItemDTO";
-import { Modal } from "@/components/modal";
 import { NetworkContext } from "@/contexts/NetworkContext";
 import { getDatabaseInspectionLocation } from "@/database/InspectionLocation";
 import { getDatabaseReason, getDatabaseReasonItemId } from "@/database/reason";
 import { addDatabaseInspection } from "@/database/inspection";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { colors } from "@/styles/colors";
 
 enum MODAL {
   NONE = 0,
@@ -36,11 +39,6 @@ enum MODAL {
   VISTORIA = 2,
   LOCAIS = 3,
 }
-
-type Locations = {
-  id: number;
-  name: string;
-};
 
 export default function Vistoria() {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -70,7 +68,9 @@ export default function Vistoria() {
   const [obs, setObs] = useState("");
 
   // Itens da vitoria
-  const [inspectionItems, setInspectionItems] = useState<InspectionItemDTO[]>();
+  const [inspectionItems, setInspectionItems] = useState<InspectionItemDTO[]>(
+    []
+  );
 
   // Imagens
   const [imagens, setImagens] = useState<ImagePicker.ImagePickerResult[] | any>(
@@ -144,7 +144,6 @@ export default function Vistoria() {
         };
       });
       setInspectionItems(result);
-      // onFormatInspectionItems(result);
     } catch (error) {
       console.log(error);
     }
@@ -152,7 +151,7 @@ export default function Vistoria() {
 
   // Função recebe os dados da vistoria selecionada
   function onSelectInspection(item: any) {
-    console.log(item);
+    //console.log(item);
 
     inspectionReasonsItems(Number(item.value));
   }
@@ -162,55 +161,6 @@ export default function Vistoria() {
     // console.log(item);
     setLocations(item);
   }
-
-  // Função atualiza os dados do item da vistoria
-  function onEditInspectionItem(updatedData: Partial<InspectionItemDTO>) {
-    const updatedItems = inspectionItems?.map((item) => {
-      if (item.id === updatedData.id) {
-        return { ...item, ...updatedData }; // Atualiza o item correspondente
-      }
-      return item; // Retorna os outros itens inalterados
-    });
-    setInspectionItems(updatedItems);
-    onFormatInspectionItems(updatedItems);
-  }
-
-  // Prepara os itens da vistoria para ser enviado no formato desejado
-  function onFormatInspectionItems(items: any) {
-    let result: any = [];
-    result = items?.map((data: any) => {
-      return {
-        [data.id]: {
-          exists: data.exists,
-          additional_info: data.additional_info,
-          status: data.status,
-        },
-      };
-    });
-
-    const formattedData = result.reduce((acc: any, currentItem: any) => {
-      // const [key, value] = Object.entries(currentItem)[0];
-
-      // acc[key] = {
-      //   ...value
-      // };
-
-      return { ...acc, ...currentItem };
-    }, {});
-
-    console.log(formattedData);
-
-    setFormData(formattedData);
-  }
-
-  // Função para ter acesso a galeria de imagens
-  const askPermission = async (failureMessage: string) => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (status === "denied") {
-      alert(failureMessage);
-    }
-  };
 
   // Função para tirar foto
   const takePhoto = async () => {
@@ -338,7 +288,7 @@ export default function Vistoria() {
     data.append("inspection_time", `${time}`);
     data.append("advertising", `${advertising}`);
     data.append("final_observations", `${obs}`);
-    data.append("inspection_items", JSON.stringify(formData));
+    data.append("inspection_items", JSON.stringify(inspectionItems));
     data.append("inspection_result", "");
     imagens.forEach((image: any, index: number) => {
       data.append("attachments[]", {
@@ -387,7 +337,7 @@ export default function Vistoria() {
         hora: time,
         advertising: advertising,
         obs: obs,
-        items: JSON.stringify(formData),
+        items: JSON.stringify(inspectionItems),
         imagens: imagensOff,
         status: "pendente",
       },
@@ -404,6 +354,14 @@ export default function Vistoria() {
       console.log(error);
     }
   }
+
+  const handleSave = (updatedData: any) => {
+    // Aqui você pode mandar pra API
+    setModal(MODAL.NONE);
+    setInspectionItems(updatedData);
+    //console.log("Checklist atualizado:", updatedData);
+    //Alert.alert("Checklist salvo", JSON.stringify(updatedData, null, 2));
+  };
 
   useEffect(() => {
     getInspectionReasons();
@@ -578,20 +536,17 @@ export default function Vistoria() {
                 placeholder="Local da Vistoria"
               />
 
-              <Text className="mb-4 text-gray-500 font-regular text-2xl font-bold">
-                Itens da Vistoria
-              </Text>
-
-              {inspectionItems?.map((item, index) => (
-                <InspectionItem
-                  key={index}
-                  item={item}
-                  onInspectData={onEditInspectionItem}
-                />
-              ))}
+              {inspectionItems.length > 0 && (
+                <Button
+                  variant="primary"
+                  onPress={() => setModal(MODAL.VISTORIA)}
+                >
+                  <Button.TextButton title="Itens da Vistoria" />
+                </Button>
+              )}
 
               {/* Imagens do Veiculo */}
-              <View className="flex flex-row justify-between mb-4">
+              <View className="flex flex-row justify-between my-4">
                 <View className="flex-1 mr-2">
                   <Button variant="primary" onPress={() => takePhoto()}>
                     <Button.TextButton title="Tirar foto" />
@@ -649,12 +604,22 @@ export default function Vistoria() {
           </View>
         </ScrollView>
         <Modal
-          className="bg-gray-200"
-          variant="primary"
           visible={modal === MODAL.IMAGENS}
-          onClose={() => setModal(MODAL.NONE)}
+          animationType="slide"
+          onRequestClose={() => setModal(MODAL.NONE)}
         >
-          <View className="flex-1">
+          <View className="flex-1 bg-white p-4">
+            <TouchableOpacity
+              activeOpacity={0.7}
+              className="self-end mb-4"
+              onPress={() => setModal(MODAL.NONE)}
+            >
+              <MaterialCommunityIcons
+                name="close-circle-outline"
+                size={30}
+                color={colors.blue[500]}
+              />
+            </TouchableOpacity>
             <FlatList
               data={isConnect ? imagens : imagensOff}
               renderItem={({ item, index }) => (
@@ -679,6 +644,31 @@ export default function Vistoria() {
               )}
               showsVerticalScrollIndicator={false}
             />
+          </View>
+        </Modal>
+        <Modal
+          visible={modal === MODAL.VISTORIA}
+          animationType="slide"
+          onRequestClose={() => setModal(MODAL.NONE)}
+        >
+          <View className="flex-1  bg-white p-4">
+            <View className="flex-row justify-between items-center">
+              <Text className="font-semiBold text-xl">Lista de Items</Text>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                className="self-end mb-4"
+                onPress={() => setModal(MODAL.NONE)}
+              >
+                <MaterialCommunityIcons
+                  name="close-circle-outline"
+                  size={30}
+                  color={colors.blue[500]}
+                />
+              </TouchableOpacity>
+            </View>
+            {inspectionItems && (
+              <InspectionItem data={inspectionItems} onSave={handleSave} />
+            )}
           </View>
         </Modal>
       </View>
