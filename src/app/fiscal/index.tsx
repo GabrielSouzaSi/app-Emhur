@@ -1,6 +1,7 @@
 import { useContext, useEffect, useState } from "react";
 import { useRouter } from "expo-router";
-import { Alert, FlatList, View } from "react-native";
+import { Alert, FlatList, Text, View } from "react-native";
+import Constants from "expo-constants";
 
 import { HeaderMenu } from "@/components/headerMenu";
 import { MenuCard } from "@/components/menuCard";
@@ -36,6 +37,8 @@ type MenuItem = MenuItemBase | MenuItemEmpty;
 export default function HomeFiscal() {
   const { isConnect } = useContext(NetworkContext);
   const [isLoaded, setIsLoaded] = useState(false);
+
+  const versao = Constants.expoConfig?.version || "Desconhecida";
 
   const router = useRouter();
 
@@ -189,6 +192,7 @@ export default function HomeFiscal() {
           )
         }
       />
+      <Text className="absolute bottom-2 left-4 text-sm text-gray-500">{`V.: ${versao}`}</Text>
 
       {isLoaded ? <Loading /> : <></>}
     </View>
