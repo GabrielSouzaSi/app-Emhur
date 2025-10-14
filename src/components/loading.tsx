@@ -5,7 +5,7 @@ import colors from "tailwindcss/colors";
 export function Loading() {
   return (
     <View className="absolute inset-0 flex justify-center items-center bg-black/50">
-      <ActivityIndicator size="large" color={colors.green[500]} />
+      <ActivityIndicator size="large" color={colors.blue[500]} />
     </View>
   );
 }
