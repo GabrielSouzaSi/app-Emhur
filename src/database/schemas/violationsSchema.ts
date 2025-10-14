@@ -13,6 +13,10 @@ export const violations = sqliteTable("violations", {
         .$type<string[]>()
         .default(sql`(json_array())`),
     local: text("local"),
+    driver: text("assistenteName"),
+    driverCfp: text("assistenteCPF"),
+    driverCnh: text("assistenteCNH"),
+    signatureUri: text("signatureUri"),
     latitude: text("latitude"),
     longitude: text("longitude"),
     data: text("data"),
