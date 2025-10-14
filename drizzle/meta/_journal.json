@@ -15,6 +15,13 @@
       "when": 1759329411715,
       "tag": "0001_cooing_speed",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1760382492016,
+      "tag": "0002_smooth_goblin_queen",
+      "breakpoints": true
     }
   ]
 }
