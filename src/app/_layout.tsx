@@ -4,6 +4,7 @@ import { Stack, useRouter } from "expo-router";
 import { StatusBar, View } from "react-native";
 import React, { useEffect } from "react";
 import * as SplashScreen from "expo-splash-screen";
+import Toast from "react-native-toast-message";
 
 // Database
 import { DATABASE_NAME, db, expoDb } from "@/database/connection";
@@ -22,12 +23,13 @@ import {
 import { AuthContextProvider } from "@/contexts/AuthContext";
 import { useAuth } from "@/hooks/useAuth";
 import { Loading } from "@/components/loading";
+import { CustomToast } from "@/components/CustomToast";
 
 SplashScreen.preventAutoHideAsync();
 
 function StackLayout() {
   const { success, error } = useMigrations(db, migrations);
-  useDrizzleStudio(expoDb)
+  useDrizzleStudio(expoDb);
   const { user } = useAuth();
   const router = useRouter();
 
@@ -38,29 +40,24 @@ function StackLayout() {
     Montserrat_700Bold,
   });
 
-  // console.log("Success =>", success);
-  // console.log("Error => ", error);
-  // console.log("isFontLoaded => ", isFontLoaded);
-
   useEffect(() => {
-    // console.log("authState", user);
-    // console.log(isFontLoaded, success);
     if (isFontLoaded && success) {
+      SplashScreen.hideAsync();
+
+      // Evita redirecionar várias vezes
       if (!user?.id) {
-        console.log("===Login===");
         router.replace("/");
-      } else if (user?.id) {
-        console.log("===Fiscal===");
+      } else {
         router.replace("/fiscal");
       }
-    } else {
-      return;
     }
-  }, [user, isFontLoaded, success]);
+  }, [isFontLoaded, success, user]);
 
-  setTimeout(() => {
-    SplashScreen.hideAsync();
-  }, 2000);
+  if (!__DEV__) {
+    console.log = () => {};
+    console.warn = () => {};
+    console.error = () => {};
+  }
 
   return (
     <View className="flex-1">
@@ -73,6 +70,13 @@ function StackLayout() {
       ) : (
         <Loading />
       )}
+      <Toast
+        config={{
+          success: (props) => <CustomToast {...props} type="success" />,
+          error: (props) => <CustomToast {...props} type="error" />,
+          info: (props) => <CustomToast {...props} type="info" />,
+        }}
+      />
     </View>
   );
 }
