@@ -22,6 +22,34 @@
       "when": 1760382492016,
       "tag": "0002_smooth_goblin_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1763989593451,
+      "tag": "0003_skinny_dark_phoenix",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1764214745226,
+      "tag": "0004_overjoyed_queen_noir",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1764264838678,
+      "tag": "0005_daily_apocalypse",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1764311391027,
+      "tag": "0006_lowly_jack_flag",
+      "breakpoints": true
     }
   ]
 }

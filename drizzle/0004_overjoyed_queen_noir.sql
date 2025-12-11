@@ -1,0 +1,1 @@
+ALTER TABLE `violationsCode` ADD `permit_types` text DEFAULT (json_array());
