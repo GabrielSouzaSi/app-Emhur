@@ -6,8 +6,13 @@ import { useAuth } from "@/hooks/useAuth";
 
 import styles from "@/styles/shadow";
 import { FontAwesome6 } from "@expo/vector-icons";
+import { exportDatabase } from "@/database/exportDatabase";
 
-export function HeaderMenu() {
+type HeaderMenuProps = {
+  onUpdate: () => void;
+};
+
+export function HeaderMenu({ onUpdate }: HeaderMenuProps) {
   const router = useRouter();
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
   const { signOut } = useAuth();
@@ -78,6 +83,25 @@ export function HeaderMenu() {
                 Escala
               </Text>
             </Pressable>
+            <Pressable
+              onPress={() => {
+                setIsDropdownVisible(false);
+                onUpdate();
+              }}
+              className="px-4 py-3 border-b border-zinc-100"
+            >
+              <Text className="font-regular font-bold text-base text-blue-500">
+                Atualizar
+              </Text>
+            </Pressable>
+            {/* <Pressable
+              onPress={exportDatabase}
+              className="px-4 py-3 border-b border-zinc-100"
+            >
+              <Text className="font-regular font-bold text-base text-blue-500">
+                Backup
+              </Text>
+            </Pressable> */}
             <Pressable
               onPress={() => {
                 setIsDropdownVisible(false);
