@@ -3,6 +3,11 @@ import { View, Text, TouchableOpacity, ScrollView } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import colors from "tailwindcss/colors";
 
+type judgementStatus = {
+  id: number;
+  name: string;
+};
+
 type Historico = {
   id: 1;
   auto_number: string;
@@ -23,16 +28,16 @@ type Historico = {
   inspection_reason_id: number;
   inspection_date: string;
   inspection_result: string;
+  judgement_status: judgementStatus | null;
 };
-
 
 type DataTableProps = {
   data: Historico[];
+  type: "violation" | "inspection";
   onEdit: (item: any) => void;
 };
 
-const DataTable: React.FC<DataTableProps> = ({ data, onEdit }) => {
-  
+const DataTable: React.FC<DataTableProps> = ({ data, type, onEdit }) => {
   const convertDate = (dateString: string): string => {
     const [year, month, day] = dateString.split("-");
     return `${day}/${month}/${year}`;
@@ -65,37 +70,42 @@ const DataTable: React.FC<DataTableProps> = ({ data, onEdit }) => {
       </View>
 
       {/* Linhas de Dados */}
-      <ScrollView
-      showsVerticalScrollIndicator={false}
-      >
-      {data.map((item, index) => (
-      <View
-        className="flex-row border-b py-2 px-3 border-gray-400"
-        key={index}
-      >
-        <View className="flex-1">
-          <Text>{item.auto_number}</Text>
-        </View>
-        <View className="flex-1">
-          <Text>{item.violation_date ? convertDate(item.violation_date): convertDate(item.inspection_date) }</Text>
-        </View>
-        <View className="flex-1">
-          <Text>
-            {item.violation_date ? item.judgement_status_id ? "Procedente" : "Improcedente" : item.inspection_result}
-          </Text>
-        </View>
-        <View className="flex">
-          <TouchableOpacity onPress={() => onEdit(item.id)}>
-            <MaterialCommunityIcons
-              name="eye-outline"
-              size={24}
-              color={colors.blue[400]}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-    ))}
-        
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {data.map((item, index) => (
+          <View
+            className="flex-row border-b py-2 px-3 border-gray-400"
+            key={index}
+          >
+            <View className="flex-1">
+              <Text>{item.auto_number}</Text>
+            </View>
+            <View className="flex-1">
+              <Text>
+                {item.violation_date
+                  ? convertDate(item.violation_date)
+                  : convertDate(item.inspection_date)}
+              </Text>
+            </View>
+            <View className="flex-1">
+              <Text>
+                {type === "violation"
+                  ? item.judgement_status === null
+                    ? "Criado"
+                    : item.judgement_status.name
+                  : item.inspection_result}
+              </Text>
+            </View>
+            <View className="flex">
+              <TouchableOpacity onPress={() => onEdit(item.id)}>
+                <MaterialCommunityIcons
+                  name="eye-outline"
+                  size={24}
+                  color={colors.blue[400]}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
       </ScrollView>
     </View>
   );
