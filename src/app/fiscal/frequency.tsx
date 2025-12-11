@@ -1,15 +1,27 @@
-import { Button } from "@/components/button";
-import { HeaderBack } from "@/components/headerBack";
 import React, { useState } from "react";
-import { FlatList, Pressable, Text, View, Dimensions } from "react-native";
+import { FlatList, Pressable, Text, View } from "react-native";
+import { HeaderBack } from "@/components/headerBack";
+import { Button } from "@/components/button";
+import { Field } from "@/components/input";
+import { number } from "@/number";
 
-const initialVehicles = Array.from({ length: 30 }, (_, i) => ({
-  vehicle: (i + 1).toString().padStart(3, "0"),
+const sorted = [...number].sort((a, b) => Number(a) - Number(b));
+
+const data = sorted.map((item) => ({
+  vehicle: item,
   status: false,
 }));
 
+const today = new Date();
+const formattedDate = today.toLocaleDateString("pt-BR");
+
 export default function VehicleChecklist() {
-  const [vehicles, setVehicles] = useState(initialVehicles);
+  const [vehicles, setVehicles] = useState(data);
+  const [search, setSearch] = useState("");
+
+  const filteredVehicles = vehicles.filter((v) =>
+    v.vehicle.toLowerCase().includes(search.toLowerCase())
+  );
 
   // Define o número de colunas dinamicamente com base no número de veículos ou largura da tela
   const numColumns = Math.min(3, vehicles.length); // até 3 colunas (ou você pode calcular com base na largura da tela)
@@ -20,40 +32,72 @@ export default function VehicleChecklist() {
     setVehicles(updated);
   };
 
+  const handleSubmit = () => {
+    const selected = vehicles.filter((v) => v.status);
+
+    if (selected.length === 0) {
+      alert("Nenhum veículo selecionado!");
+      return;
+    }
+
+    // Exibe no alerta
+    alert(
+      `Selecionados (${selected.length}):\n` +
+        selected.map((v) => v.vehicle).join(", ")
+    );
+
+    // 👉 Se quiser enviar para API, salvar local, ou navegar, faça aqui
+    console.log("Selecionados:", selected);
+  };
+
   return (
     <View className="flex-1 bg-white">
-      <HeaderBack title={`Frequência 11/06/2025`} variant="primary" />
+      <HeaderBack title={`Frequência ${formattedDate}`} variant="primary" />
+
+      {/* Campo de busca */}
+      <View className="p-4">
+        <Field
+          placeholder="Buscar veículo..."
+          value={search}
+          onChangeText={setSearch}
+          keyboardType="number-pad"
+        />
+      </View>
+
       <FlatList
-        data={vehicles}
-        key={numColumns} // força re-render se numColumns mudar
+        data={filteredVehicles}
+        key={numColumns}
         numColumns={numColumns}
         keyExtractor={(_, index) => index.toString()}
         renderItem={({ item, index }) => (
           <Pressable
-            onPress={() => toggleStatus(index)}
+            onPress={() => toggleStatus(vehicles.indexOf(item))}
             style={{
               flex: 1,
-              margin: 8,
+              margin: 6,
               height: 60,
               borderRadius: 8,
               justifyContent: "center",
               alignItems: "center",
-              backgroundColor: item.status ? "#4ade80" : "#e5e7eb", // verde se selecionado, cinza se não
+              backgroundColor: item.status ? "#2563eb" : "#e5e7eb",
             }}
           >
-            <Text style={{ fontWeight: "bold", color: "#1f2937" }}>
+            <Text
+              style={{
+                fontWeight: "bold",
+                color: item.status ? "#fff" : "#1f2937",
+                fontSize: 16,
+              }}
+            >
               {item.vehicle}
             </Text>
           </Pressable>
         )}
-        contentContainerStyle={{
-          paddingTop: 16,
-          paddingBottom: 16,
-        }}
         showsVerticalScrollIndicator={false}
       />
+
       <View className="m-4">
-        <Button variant="primary">
+        <Button variant="primary" onPress={handleSubmit}>
           <Button.TextButton title="Enviar" />
         </Button>
       </View>
