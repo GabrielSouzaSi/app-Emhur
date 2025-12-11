@@ -1,46 +1,58 @@
 import { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  Image
-} from "react-native";
-import { cssInterop } from "nativewind";
+import { View, Text, ScrollView, Image } from "react-native";
 
 import { useLocalSearchParams } from "expo-router";
 
 import { HeaderBack } from "@/components/headerBack";
-import { Loading } from "@/components/loading";
+import { Loading, LoadingLight } from "@/components/loading";
 import { VehicleDTO } from "@/dtos/vehicleDTO";
-import { PermitHolderDTO } from "@/dtos/permitHolderDTO";
 import { server } from "@/server/api";
-
-// Definimos um componente "Image" estilizado
-const StyledImage = cssInterop(Image, {
-  className: "style",
-});
-
+import { Holder } from "@/components/Holder";
+import { getDatabaseReasonId } from "@/database/reason";
 
 export default function IdInspection() {
   const { id } = useLocalSearchParams();
   const [isLoaded, setIsLoaded] = useState(false);
   const [vehicle, setVehicle] = useState<VehicleDTO>();
-  const [img , setImg] = useState([]);
+  const [img, setImg] = useState([]);
+  const [info, setInfo] = useState<any>();
+  const [reason, setReason] = useState<string>("");
+
   // Condutor
   const [condutor, setCondutor] = useState<any>(false);
-  const [advertising, setAdvertising] = useState("");
   const [description, setDescription] = useState("");
+  const [loading, setLoading] = useState({}); // controla loading individual
+
+  function handleLoadStart(uri) {
+    setLoading((prev) => ({ ...prev, [uri]: true }));
+  }
+
+  function handleLoadEnd(uri) {
+    setLoading((prev) => ({ ...prev, [uri]: false }));
+  }
 
   async function getInspectionID() {
     try {
       setIsLoaded(true);
       const { data } = await server.get(`/inspection/show/${id}`);
-      setVehicle(data.inspection.permit.vehicle);
-      setCondutor(data.inspection.permit.holder);
-      setAdvertising(data.inspection.advertising);
+
+      const { inspection } = data;
+
+      setVehicle(inspection.permit.vehicle);
+      setCondutor(inspection.permit.holder);
       setDescription(data.inspection.final_observations);
-      const arr = JSON.parse(data.inspection.attachments);            
-      setImg(arr)
+      const arr = data.inspection.attachments;
+      setImg(arr);
+
+      setInfo({
+        autoNumber: inspection.auto_number,
+        date: inspection.inspection_date,
+        time: inspection.inspection_time,
+        result: inspection.inspection_result,
+        reason: inspection.inspection_reason_id,
+        location: inspection.inspection_location_id,
+        inspectionItems: Object.entries(inspection.inspection_items),
+      });
     } catch (error) {
       throw error;
     } finally {
@@ -48,180 +60,79 @@ export default function IdInspection() {
     }
   }
 
+  // Função para listar os itens da vistoria
+  async function inspectionReasonsItems(id: number) {
+    try {
+      const data = await getDatabaseReasonId(id);
+      if (data) {
+        setReason(data.name);
+      } else {
+        setReason("");
+        alert(
+          "Motivo da vistoria não encontrado no banco de dados local. Atualize o aplicativo e tente novamente."
+        );
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
   useEffect(() => {
-    getInspectionID();        
+    getInspectionID();
   }, []);
+  useEffect(() => {
+    if (!info?.reason) return; // só entra se info existir e tiver reason
+
+    inspectionReasonsItems(Number(info.reason));
+  }, [info?.reason]); // dependência mais específica
+
   return (
     <View>
       {/* Cabeçalho */}
-      <HeaderBack title={`Vistoria Nº `} variant="primary" />
+      <HeaderBack
+        title={`Vistoria Nº${info?.autoNumber || ""}`}
+        variant="primary"
+      />
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
         <View className="flex p-4">
-          {/* Numero da infração */}
-          <View className="flex-row items-center mb-5"></View>
-
-          {/* Veiculo */}
-          <View>
-            <Text className="mb-4 text-gray-500 font-regular text-2xl font-bold">
-              Informações do Veículo:
+          <View className="mb-4">
+            <Text className="text-gray-500 font-bold text-2xl">
+              Data e Hora:
             </Text>
-            <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
-              <View className="flex flex-row justify-between mb-4 gap-4">
-                <View className="flex-1">
-                  <Text className="text-gray-500 font-regular text-2xl font-bold">
-                    Placa:
-                  </Text>
-                  <View className="bg-gray-300 rounded-md p-3">
-                    <Text className="font-semiBold text-lg">
-                      {vehicle?.plate_number}
-                    </Text>
-                  </View>
-                </View>
-                <View className="flex-1">
-                  <Text className="text-gray-500 font-regular text-2xl font-bold">
-                    Marca:
-                  </Text>
-                  <View className="bg-gray-300 rounded-md p-3">
-                    <Text className="font-semiBold text-lg">
-                      {vehicle?.make}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              <View className="flex flex-row justify-between mb-4 gap-4">
-                <View className="flex-1">
-                  <Text className="text-gray-500 font-regular text-2xl font-bold">
-                    Modelo:
-                  </Text>
-                  <View className="bg-gray-300 rounded-md p-3">
-                    <Text className="font-semiBold text-lg">
-                      {vehicle?.model}
-                    </Text>
-                  </View>
-                </View>
-                <View className="flex-1">
-                  <Text className="text-gray-500 font-regular text-2xl font-bold">
-                    Cor:
-                  </Text>
-                  <View className="bg-gray-300 rounded-md p-3">
-                    <Text className="font-semiBold text-lg">
-                      {vehicle?.color}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              <View className="flex flex-row justify-between mb-4 gap-4">
-                <View className="flex-1">
-                  <Text className="text-gray-500 font-regular text-2xl font-bold">
-                    Ano:
-                  </Text>
-                  <View className="bg-gray-300 rounded-md p-3">
-                    <Text className="font-semiBold text-lg">
-                      {vehicle?.year}
-                    </Text>
-                  </View>
-                </View>
-                <View className="flex-1">
-                  <Text className="text-gray-500 font-regular text-2xl font-bold">
-                    Renavam:
-                  </Text>
-                  <View className="bg-gray-300 rounded-md p-3">
-                    <Text className="font-semiBold text-lg">
-                      {vehicle?.renavam.slice(0, 3)}*****
-                    </Text>
-                  </View>
-                </View>
-              </View>
+            <View className="bg-white rounded-md p-2 border-2 border-gray-300">
+              <Text className="font-semibold text-lg">
+                {info?.date} - {info?.time}
+              </Text>
             </View>
           </View>
 
-          {/* Condutor/Permissionário */}
-          {condutor.attorney_id ? (
-              <View className="flex">
-                <Text className="my-4 text-gray-500 font-regular text-2xl font-bold">
-                  Condutor/Permissionário:
-                </Text>
-                <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
-                  <View className="flex flex-row justify-between mb-4 gap-4">
-                    <View className="flex-1">
-                      <Text className="text-gray-500 font-regular text-2xl font-bold">
-                        Nome:
-                      </Text>
-                      <View className="bg-gray-300 rounded-md p-3">
-                        <Text className="font-semiBold text-lg">
-                          {condutor.name}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                  <View className="flex flex-row justify-between mb-4 gap-4">
-                    <View className="flex-1">
-                      <Text className="text-gray-500 font-regular text-2xl font-bold">
-                        CPF:
-                      </Text>
-                      <View className="bg-gray-300 rounded-md p-3">
-                        <Text className="font-semiBold text-lg">
-                          {condutor.cpf}
-                        </Text>
-                      </View>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-gray-500 font-regular text-2xl font-bold">
-                        VALIDADE CNH:
-                      </Text>
-                      <View className="bg-gray-300 rounded-md p-3">
-                        <Text className="font-semiBold text-lg">
-                          {condutor.validade_cnh}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                  <View className="flex flex-row justify-between mb-4 gap-4">
-                    <View className="flex-1">
-                      <Text className="text-gray-500 font-regular text-2xl font-bold">
-                      Categoria:
-                      </Text>
-                      <View className="bg-gray-300 rounded-md p-3">
-                        <Text className="font-semiBold text-lg">
-                          {condutor.categoria}
-                        </Text>
-                      </View>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-gray-500 font-regular text-2xl font-bold">
-                      CNH:
-                      </Text>
-                      <View className="bg-gray-300 rounded-md p-3">
-                        <Text className="font-semiBold text-lg">
-                          {condutor.cnh}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            ) : (
-              ""
-            )}
+          <View className="mb-4">
+            <Text className="text-gray-500 font-bold text-2xl">Resultado:</Text>
+            <View className="bg-white rounded-md p-2 border-2 border-gray-300">
+              <Text className="font-semibold text-lg">{info?.result}</Text>
+            </View>
+          </View>
+
+          {/* Veiculo e Permissionário */}
+          <Holder permitHolder={condutor} vehicle={vehicle} />
 
           {/* Motivo da Vistoria */}
           <View className="">
-            <Text className="mb-4 text-gray-500 font-regular text-2xl font-bold">
+            <Text className="text-gray-500 font-regular text-2xl font-bold">
               Motivo da Vistoria:
             </Text>
             <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
-              <Text className="font-semiBold text-lg">Renovação de Alvará</Text>
+              <Text className="font-semibold text-lg">{reason}</Text>
             </View>
           </View>
 
           {/* Local da Vistoria */}
           <View className="flex">
-            <Text className="my-4 text-gray-500 font-regular text-2xl font-bold">
+            <Text className="text-gray-500 font-regular text-2xl font-bold">
               Local da Vistoria:
             </Text>
 
@@ -230,18 +141,32 @@ export default function IdInspection() {
             </View>
           </View>
 
-          {/* Anúncio/Propaganda */}
-          <View className="flex mb-5">
-            <Text className="my-4 text-gray-500 font-regular text-2xl font-bold">
-            Anúncio/Propaganda:
+          {/*Exibir itens de vistoria */}
+          <View>
+            <Text className="text-gray-500 font-bold text-2xl">
+              Itens da Vistoria:
             </Text>
-            <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
-              <Text className="font-semiBold text-lg">{advertising}</Text>
-            </View>
+
+            {info?.inspectionItems?.map(([key, item]) => (
+              <View
+                key={key}
+                className="bg-white border-2 border-gray-300 rounded-md mb-4 p-3"
+              >
+                <Text className="font-bold">
+                  Item: {key} - {item.item ? item.item : ""}
+                </Text>
+                <Text>Existe: {item.exists === "1" ? "Sim" : "Não"}</Text>
+                <Text>Status: {item.status}</Text>
+                {item.additional_info && (
+                  <Text>Info adicional: {item.additional_info}</Text>
+                )}
+              </View>
+            ))}
           </View>
+
           {/* Observação */}
-          <View className="flex mb-5">
-            <Text className="my-4 text-gray-500 font-regular text-2xl font-bold">
+          <View className="flex">
+            <Text className="text-gray-500 font-regular text-2xl font-bold">
               Observação:
             </Text>
             <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
@@ -252,16 +177,26 @@ export default function IdInspection() {
             <Text className="text-gray-500 font-regular text-2xl font-bold">
               Imagens:
             </Text>
-            {img.map((item) => (
-              <StyledImage
-              key={item}
-              source={{
-                uri: `https://emhur.conexo.solutions/storage/${item}`,
-              }} // URL da imagem
-              className="w-3/4 h-40 md:w-full md:h-64" // Altura ajustada pela proporção desejada
-              resizeMode="contain" // Ajusta o modo de redimensionamento para conter a imagem
-            />
-            )) }
+            {img.map((item) => {
+              const uri = `https://emhur.conexo.solutions/storage/${item}`;
+
+              return (
+                <View
+                  key={item}
+                  className="w-full h-64 items-center justify-center"
+                >
+                  {loading[uri] && <LoadingLight />}
+
+                  <Image
+                    source={{ uri }}
+                    className="w-full h-64"
+                    resizeMode="contain"
+                    onLoadStart={() => handleLoadStart(uri)}
+                    onLoadEnd={() => handleLoadEnd(uri)}
+                  />
+                </View>
+              );
+            })}
           </View>
         </View>
       </ScrollView>
