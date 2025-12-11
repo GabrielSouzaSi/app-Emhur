@@ -1,47 +1,54 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, ScrollView, Image } from "react-native";
-import { cssInterop } from "nativewind";
 
 import { useLocalSearchParams } from "expo-router";
 
 import { HeaderBack } from "@/components/headerBack";
-import { Loading } from "@/components/loading";
+import { LoadingLight, LoadingTop } from "@/components/loading";
 import { VehicleDTO } from "@/dtos/vehicleDTO";
-import { PermitHolderDTO } from "@/dtos/permitHolderDTO";
 import { server } from "@/server/api";
 
-// Definimos um componente "Image" estilizado
-const StyledImage = cssInterop(Image, {
-  className: "style",
-});
+type ViolationCode = {
+  code: string;
+  description: string;
+};
 
 export default function IdAutuacao() {
   const { id } = useLocalSearchParams();
   const [isLoaded, setIsLoaded] = useState(false);
   const [vehicle, setVehicle] = useState<VehicleDTO>();
-  const [img , setImg] = useState([]);
-  const [approach, setApproach] = useState("");
+  const [img, setImg] = useState([]);
+  const [approach, setApproach] = useState<any>();
   const [description, setDescription] = useState("");
-  const [code, setCode] = useState("");
-  const [permitHolder, setPermitHolder] = useState<PermitHolderDTO>();
+  const [signatureBase64, setSignatureBase64] = useState("");
+  const [code, setCode] = useState<ViolationCode[]>([]);
+  const [permitHolder, setPermitHolder] = useState<any>();
+  const [loading, setLoading] = useState({}); // controla loading individual
 
+  function handleLoadStart(uri) {
+    setLoading((prev) => ({ ...prev, [uri]: true }));
+  }
+
+  function handleLoadEnd(uri) {
+    setLoading((prev) => ({ ...prev, [uri]: false }));
+  }
 
   async function getViolationCode() {
     try {
       setIsLoaded(true);
       const { data } = await server.get(`/violation/show/${id}`);
-      const { vehicle_id, violation } = data;
+      const { vehicle_id, violation, violationCodes } = data;
+
+      setPermitHolder(violation);
+      setVehicle(vehicle_id);
 
       const arr = JSON.parse(violation.attachments);
-      setImg(arr)
+      setImg(arr);
 
-      setApproach(data.violation.approach.name);
-      setCode(
-        `${data.violation.violation_code.code}:${data.violation.violation_code.description}`
-      );
-      setDescription(data.violation.description);
-      setVehicle(vehicle_id);
-      setPermitHolder(data.violation.permit_holder);
+      setApproach(violation.approach);
+      setCode(violationCodes);
+      setSignatureBase64(violation.signature_base64);
+      setDescription(violation.description);
     } catch (error) {
       throw error;
     } finally {
@@ -55,12 +62,15 @@ export default function IdAutuacao() {
   return (
     <View>
       {/* Cabeçalho */}
-      <HeaderBack title={`Autuação Nº `} variant="primary" />
+      <HeaderBack
+        title={`Autuação Nº ${permitHolder?.auto_number || ""}`}
+        variant="primary"
+      />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
       >
-        <View className="flex p-4">
+        <View className="flex px-4">
           {/* Numero da infração */}
           <View className="flex-row items-center mb-5"></View>
 
@@ -143,7 +153,7 @@ export default function IdAutuacao() {
 
           {/* Dados do Condutor/Infrator */}
           <View className="flex">
-            <Text className="my-4 text-gray-500 font-regular text-2xl font-bold">
+            <Text className="mb-4 text-gray-500 font-regular text-2xl font-bold">
               Dados do Permissionário:
             </Text>
             <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
@@ -154,7 +164,7 @@ export default function IdAutuacao() {
                   </Text>
                   <View className="bg-gray-300 rounded-md p-3">
                     <Text className="font-semiBold text-lg">
-                      {permitHolder?.name}
+                      {permitHolder?.permit_holder.name}
                     </Text>
                   </View>
                 </View>
@@ -167,7 +177,7 @@ export default function IdAutuacao() {
                   </Text>
                   <View className="bg-gray-300 rounded-md p-3">
                     <Text className="font-semiBold text-lg">
-                      {permitHolder?.cpf.slice(0, 3)}*****
+                      {permitHolder?.permit_holder.cpf.slice(0, 3)}*****
                     </Text>
                   </View>
                 </View>
@@ -177,7 +187,7 @@ export default function IdAutuacao() {
                   </Text>
                   <View className="bg-gray-300 rounded-md p-3">
                     <Text className="font-semiBold text-lg">
-                      {permitHolder?.cnh.slice(0, 3)}*****
+                      {permitHolder?.permit_holder.cnh.slice(0, 3)}*****
                     </Text>
                   </View>
                 </View>
@@ -185,26 +195,98 @@ export default function IdAutuacao() {
             </View>
           </View>
 
+          {/* Dados do Condutor */}
+          {permitHolder?.driver && (
+            <View className="flex">
+              <Text className="my-4 text-gray-500 font-regular text-2xl font-bold">
+                Dados do Condutor:
+              </Text>
+              <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
+                <View className="flex flex-row justify-between mb-4 gap-4">
+                  <View className="flex-1">
+                    <Text className="text-gray-500 font-regular text-2xl font-bold">
+                      Nome:
+                    </Text>
+                    <View className="bg-gray-300 rounded-md p-3">
+                      <Text className="font-semiBold text-lg">
+                        {permitHolder?.driver}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View className="flex flex-row justify-between mb-4 gap-4">
+                  <View className="flex-1">
+                    <Text className="text-gray-500 font-regular text-2xl font-bold">
+                      CPF:
+                    </Text>
+                    <View className="bg-gray-300 rounded-md p-3">
+                      <Text className="font-semiBold text-lg">
+                        {permitHolder?.cpf_driver.slice(0, 3)}*****
+                      </Text>
+                    </View>
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-gray-500 font-regular text-2xl font-bold">
+                      CNH:
+                    </Text>
+                    <View className="bg-gray-300 rounded-md p-3">
+                      <Text className="font-semiBold text-lg">
+                        {permitHolder?.cnh_driver.slice(0, 3)}*****
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+
           {/* Modo de abordagem */}
-          <View className="">
+          <View>
             <Text className="mb-4 text-gray-500 font-regular text-2xl font-bold">
               Modo de abordagem:
             </Text>
             <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
-              <Text className="font-semiBold text-lg">{approach}</Text>
+              <Text className="font-semiBold text-lg">{approach?.name}</Text>
             </View>
           </View>
 
           {/* Dados da Infração */}
-          <View className="flex">
-            <Text className="my-4 text-gray-500 font-regular text-2xl font-bold">
-              Dados da Infração:
+          <View>
+            <Text className="mb-4 text-gray-500 font-regular text-2xl font-bold">
+              Infrações:{` (${code?.length})`}
             </Text>
-
-            <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
-              <Text className="font-semiBold text-lg">{code}</Text>
+            <View className="">
+              {code?.map((item, index) => (
+                <View
+                  key={index}
+                  className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4"
+                >
+                  <Text className="font-semiBold text-lg">{`0${index + 1} - ${
+                    item.code
+                  }: ${item.description} `}</Text>
+                </View>
+              ))}
             </View>
+
+            {/* <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
+              <Text className="font-semiBold text-lg">{code}</Text>
+            </View> */}
           </View>
+          {signatureBase64 && (
+            <View className="flex-1 justify-center items-center gap-4 mt-3">
+              <Text className="text-gray-500 font-regular text-2xl font-bold">
+                Assinatura:
+              </Text>
+              <Image
+                source={{
+                  uri: signatureBase64,
+                }} // URL da imagem
+                className="w-3/4 h-40 md:w-full md:h-64" // Altura ajustada pela proporção desejada
+                resizeMode="contain" // Ajusta o modo de redimensionamento para conter a imagem
+              />
+            </View>
+          )}
 
           {/* Observação */}
           <View className="flex mb-5">
@@ -219,20 +301,30 @@ export default function IdAutuacao() {
             <Text className="text-gray-500 font-regular text-2xl font-bold">
               Imagens:
             </Text>
-            {img.map((item) => (
-              <StyledImage
-              key={item}
-              source={{
-                uri: `https://emhur.conexo.solutions/storage/${item}`,
-              }} // URL da imagem
-              className="w-3/4 h-40 md:w-full md:h-64" // Altura ajustada pela proporção desejada
-              resizeMode="contain" // Ajusta o modo de redimensionamento para conter a imagem
-            />
-            ))}
+            {img.map((item) => {
+              const uri = `https://emhur.conexo.solutions/storage/${item}`;
+
+              return (
+                <View
+                  key={item}
+                  className="w-full h-64 items-center justify-center"
+                >
+                  {loading[uri] && <LoadingLight />}
+
+                  <Image
+                    source={{ uri }}
+                    className="w-full h-64"
+                    resizeMode="contain"
+                    onLoadStart={() => handleLoadStart(uri)}
+                    onLoadEnd={() => handleLoadEnd(uri)}
+                  />
+                </View>
+              );
+            })}
           </View>
         </View>
       </ScrollView>
-      {isLoaded ? <Loading /> : <></>}
+      {isLoaded ? <LoadingTop /> : <></>}
     </View>
   );
 }
