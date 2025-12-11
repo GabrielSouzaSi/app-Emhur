@@ -17,10 +17,10 @@ export const inspections = sqliteTable("inspections", {
     advertising: text("advertising"),
     obs: text("obs"),
     items: text('items', { mode: "json" })
-    .$type<string[]>()
-    .default(sql`(json_array())`),
-    imagens: text('imagens', { mode: 'json' })
         .$type<string[]>()
+        .default(sql`(json_array())`),
+    imagens: text('imagens', { mode: 'json' })
+        .$type<{ uri: string; name: string; type: string }[]>()
         .default(sql`(json_array())`),
     status: text("status")
 })
