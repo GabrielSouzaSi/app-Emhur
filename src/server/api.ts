@@ -1,7 +1,6 @@
 import axios, { AxiosError } from "axios";
-//http://appbus.conexo.solutions:8990/api/v1
 const server = axios.create({
-    baseURL: "https://emhur.conexo.solutions/api/v1",
+    baseURL: process.env.EXPO_PUBLIC_API_URL,
     timeout: 30000
 });
 
