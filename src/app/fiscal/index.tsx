@@ -1,19 +1,10 @@
-import { useContext, useEffect, useState } from "react";
 import { useRouter } from "expo-router";
-import { Alert, FlatList, Text, View } from "react-native";
+import { FlatList, Text, View } from "react-native";
 import Constants from "expo-constants";
 
 import { HeaderMenu } from "@/components/headerMenu";
 import { MenuCard } from "@/components/menuCard";
-import { server } from "@/server/api";
-import { handleRequestError, registerSetIsLoaded } from "@/utils/errorHandler";
-
-import { NetworkContext } from "@/contexts/NetworkContext";
-import { delDatabaseReason } from "@/database/reason";
-import { delDatabaseViolationCode } from "@/database/violationsCode";
-import { delDatabaseApproach } from "@/database/approach";
-import { Loading } from "@/components/loading";
-import { delDatabaseInspectionLocation } from "@/database/InspectionLocation";
+import { update } from "@/utils/configDataApp";
 
 type ViolationCode = {
   id: number;
@@ -35,9 +26,6 @@ type MenuItemEmpty = {
 type MenuItem = MenuItemBase | MenuItemEmpty;
 
 export default function HomeFiscal() {
-  const { isConnect } = useContext(NetworkContext);
-  const [isLoaded, setIsLoaded] = useState(false);
-
   const versao = Constants.expoConfig?.version || "Desconhecida";
 
   const router = useRouter();
@@ -58,11 +46,11 @@ export default function HomeFiscal() {
       icon: "car-outline",
       route: "/fiscal/veiculo",
     },
-    // {
-    //   title: "Frequência",
-    //   icon: "calendar-outline",
-    //   route: "/fiscal/frequency",
-    // },
+    {
+      title: "Frequência",
+      icon: "calendar-outline",
+      route: "/fiscal/frequency",
+    },
   ];
 
   function isMenuItemBase(item: MenuItem): item is MenuItemBase {
@@ -84,91 +72,9 @@ export default function HomeFiscal() {
     return [...menuItems, ...fillers];
   };
 
-  // Função para receber os motivos da vistoria
-  async function getInspectionReasons() {
-    setIsLoaded(true);
-    try {
-      const { data } = await server.get(`/inspection-reasons-all`);
-      // Função para adicionar no banco os motivos da vistoria
-      await delDatabaseReason(data);
-      await getViolationsCode();
-    } catch (error) {
-      handleRequestError(
-        "Não foi possível carregar os motivos da vistoria. Tente novamente.",
-        error
-      );
-    }
-  }
-
-  // Função para receber o código das autuações
-  async function getViolationsCode() {
-    try {
-      const { data } = await server.get(`/violations-code`);
-      // console.log("violations => ", data);
-      const violationsCodeData = data.map((item: ViolationCode) => {
-        return {
-          id: item.id,
-          code: item.code,
-          description: item.description,
-        };
-      });
-      // Remover e adicionar no banco os codigos de autuação
-      await delDatabaseViolationCode(violationsCodeData);
-      await getApproach();
-    } catch (error) {
-      handleRequestError(
-        "Não foi possível carregar os códigos de autuação. Tente novamente.",
-        error
-      );
-    }
-  }
-  // Função para receber o modo de abordagem
-  async function getApproach() {
-    try {
-      const { data } = await server.get(`/vehicle/1`);
-      const { approach } = data;
-      await delDatabaseApproach(approach);
-      await getInspectionLocations();
-    } catch (error) {
-      handleRequestError(
-        "Não foi possível carregar o modo de abordagem. Tente novamente.",
-        error
-      );
-    }
-  }
-  // Função para buscar a lista dos locais da vistoria
-  async function getInspectionLocations() {
-    try {
-      const { data } = await server.get("/inspection-locations");
-      await delDatabaseInspectionLocation(data);
-    } catch (error) {
-      handleRequestError(
-        "Não foi possível carregar os locais de vistoria. Tente novamente.",
-        error
-      );
-    } finally {
-      setIsLoaded(false);
-    }
-  }
-
-  // Verifica a conexão
-  useEffect(() => {
-    if (isConnect === null) return; // ainda calculando
-    if (isConnect === true) {
-      getInspectionReasons();
-    } else {
-      Alert.alert("Aviso!", "Você não está conectado.");
-      setIsLoaded(false);
-    }
-  }, [isConnect]);
-
-  useEffect(() => {
-    registerSetIsLoaded(setIsLoaded);
-  }, []);
-
   return (
     <View className="flex-1">
-      <HeaderMenu />
+      <HeaderMenu onUpdate={update} />
 
       <FlatList
         data={fillMenu()}
@@ -193,8 +99,6 @@ export default function HomeFiscal() {
         }
       />
       <Text className="absolute bottom-2 left-4 text-sm text-gray-500">{`V.: ${versao}`}</Text>
-
-      {isLoaded ? <Loading /> : <></>}
     </View>
   );
 }
