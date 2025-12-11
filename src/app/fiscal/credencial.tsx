@@ -3,10 +3,10 @@ import { Text, View } from "react-native";
 import { HeaderBack } from "@/components/headerBack";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Section } from "@/components/section";
-import { CTitleSubTitle } from "@/components/titleSubTitle";
 import { useAuth } from "@/hooks/useAuth";
 import { useEffect, useState } from "react";
 import { server } from "@/server/api";
+import { Loading } from "@/components/loading";
 
 export default function CredencialFiscal() {
   const { user } = useAuth();
@@ -17,8 +17,7 @@ export default function CredencialFiscal() {
     try {
       setIsLoaded(true);
       const { data } = await server.get(`/agent/${user.id}`);
-      console.log(data);
-      setFiscal(data)
+      setFiscal(data);
     } catch (error) {
       throw error;
     } finally {
@@ -33,36 +32,63 @@ export default function CredencialFiscal() {
       <HeaderBack title="Credencial" variant="primary" />
       {fiscal ? (
         <Section>
-        <View className="items-center justify-center mb-5">
-          <MaterialCommunityIcons name="account-box-outline" size={90} />
-          <Text className="font-semiBold text-lg">{user.name}</Text>
-          <Text className="font-regular text-lg">N° 652478</Text>
-        </View>
+          <View className="items-center justify-center mb-5">
+            <MaterialCommunityIcons name="account-box-outline" size={90} />
+          </View>
 
-        <CTitleSubTitle>
-          <CTitleSubTitle.TitleSubTitle title="Setor" subTitle={fiscal.setor} />
-          <CTitleSubTitle.TitleSubTitle title="Cargo" subTitle={fiscal.cargo} />
-        </CTitleSubTitle>
+          <View className="flex flex-row justify-between mb-4 gap-4">
+            <View className="flex-1">
+              <Text className="text-gray-500 font-regular text-2xl font-bold">
+                Nome:
+              </Text>
+              <View className="bg-gray-300 rounded-md p-3">
+                <Text className="font-semiBold text-lg">
+                  {user.name ?? "N/A"}
+                </Text>
+              </View>
+            </View>
+          </View>
 
-        <CTitleSubTitle>
-          <CTitleSubTitle.TitleSubTitle title="Matrícula" subTitle={fiscal.matricula} />
-          <CTitleSubTitle.TitleSubTitle
-            title="Ativo desde"
-            subTitle={fiscal.data_entrada}
-          />
-        </CTitleSubTitle>
-
-        <View className="items-center justify-center mt-5">
-          <MaterialCommunityIcons name="qrcode" size={90} />
-          <CTitleSubTitle>
-            <CTitleSubTitle.TitleSubTitle
-              title="Código de validação:"
-              subTitle="FFRHAETJUFVVTJ+"
-            />
-          </CTitleSubTitle>
-        </View>
-      </Section>
-      ): (<></>)}
+          <View className="flex flex-row justify-between mb-4 gap-4">
+            <View className="flex-1">
+              <Text className="text-gray-500 font-regular text-2xl font-bold">
+                Matrícula:
+              </Text>
+              <View className="bg-gray-300 rounded-md p-3">
+                <Text className="font-semiBold text-lg">
+                  {fiscal.matricula ?? "N/A"}
+                </Text>
+              </View>
+            </View>
+          </View>
+          <View className="flex flex-row justify-between mb-4 gap-4">
+            <View className="flex-1">
+              <Text className="text-gray-500 font-regular text-2xl font-bold">
+                Setor:
+              </Text>
+              <View className="bg-gray-300 rounded-md p-3">
+                <Text className="font-semiBold text-lg">
+                  {fiscal.setor ?? "N/A"}
+                </Text>
+              </View>
+            </View>
+          </View>
+          <View className="flex flex-row justify-between mb-4 gap-4">
+            <View className="flex-1">
+              <Text className="text-gray-500 font-regular text-2xl font-bold">
+                Cargo:
+              </Text>
+              <View className="bg-gray-300 rounded-md p-3">
+                <Text className="font-semiBold text-lg">
+                  {fiscal.cargo ?? "N/A"}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </Section>
+      ) : (
+        <Loading />
+      )}
     </View>
   );
 }
