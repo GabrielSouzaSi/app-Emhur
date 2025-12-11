@@ -1,7 +1,6 @@
-import { useCallback, useState, useEffect, useContext } from "react";
+import { useCallback, useState } from "react";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Alert, Text, View } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { HeaderBack } from "@/components/headerBack";
 import { Button } from "@/components/button";
@@ -9,10 +8,14 @@ import DataTable from "@/components/dataTable";
 import DataTableOff from "@/components/dataTableOff";
 import { useAuth } from "@/hooks/useAuth";
 import { server } from "@/server/api";
-import { Loading } from "@/components/loading";
-import { Modal } from "@/components/modal";
-import { delDatabaseViolationId, getDatabaseViolations } from "@/database/violation";
-import { NetworkContext } from "@/contexts/NetworkContext";
+import { LoadingLight } from "@/components/loading";
+import {
+  delDatabaseViolationId,
+  getDatabaseViolations,
+} from "@/database/violation";
+import { ImageDTO } from "@/dtos/imageDTO";
+import { Modal } from "@/components/RNModal";
+import Toast from "react-native-toast-message";
 
 enum MODAL {
   NONE = 0,
@@ -20,16 +23,12 @@ enum MODAL {
 }
 
 export default function HistoricoAutuacoes() {
-  const { isConnect } = useContext(NetworkContext);
-
   const [isLoaded, setIsLoaded] = useState(false);
-  const [isFocused, setIsFocused] = useState(false);
   const [modal, setModal] = useState(MODAL.NONE);
   const { user } = useAuth();
   const [violations, setViolations] = useState<any>();
   const [autuacoes, setAutuacoes] = useState([]);
   const [dBAutuacao, setDBAutuacao] = useState<any>();
-
 
   const router = useRouter();
 
@@ -39,133 +38,155 @@ export default function HistoricoAutuacoes() {
   };
   // Abre o modal para exibir as opções da autuação selecionada
   const handleOption = (item: any) => {
-    console.log(item);
-
     setDBAutuacao(item);
     setModal(MODAL.OPTIONS);
   };
   // Envia a autuação pendênte
   const sendViolationSelected = async () => {
     setModal(MODAL.NONE);
-    setIsLoaded(true)
-    let currentdate = new Date();
-    let time = `${currentdate.getHours()}${currentdate.getMinutes()}${currentdate.getSeconds()}`
+    setIsLoaded(true);
     try {
       const { data } = await server.get(`/vehicle/${dBAutuacao.vehicle}`);
+
       const formData = new FormData();
-      formData.append("auto_number", time.toString());
       formData.append("permit_holder_id", `${data.permit_holder_id.id}`);
       formData.append("user_id", `${user.id}`);
       formData.append("vehicle_id", `${data.vehicle_id.id}`);
       formData.append("approach_id", `${dBAutuacao.approach}`);
-      formData.append("violation_code_id", `${dBAutuacao.idInfracao}`);
+      dBAutuacao.idInfracao.forEach((id) => {
+        formData.append("violation_code_id[]", id.toString());
+      });
       formData.append("violation_date", dBAutuacao.data);
       formData.append("violation_time", dBAutuacao.hora);
       formData.append("latitude", `${dBAutuacao.latitude}`);
       formData.append("longitude", `${dBAutuacao.longitude}`);
+
+      formData.append("driver_type_id", `${dBAutuacao.driverTypeId}`);
+      formData.append(
+        "driver_name",
+        `${
+          dBAutuacao.driverTypeId == "1"
+            ? data.permit_holder_id.name
+            : dBAutuacao.driverName
+        }`
+      );
+      formData.append(
+        "driver_cpf",
+        `${
+          dBAutuacao.driverTypeId == "1"
+            ? data.permit_holder_id.cpf
+            : dBAutuacao.driverCpf
+        }`
+      );
+      formData.append(
+        "driver_cnh",
+        `${
+          dBAutuacao.driverTypeId == "1"
+            ? data.permit_holder_id.cnh
+            : dBAutuacao.driverCnh
+        }`
+      );
+
+      formData.append("signature_base64", `${dBAutuacao.signatureUri}`);
       formData.append("address", dBAutuacao.local);
       formData.append("description", dBAutuacao.obs);
-      dBAutuacao.imagens.forEach((image: any) => {
+      dBAutuacao.imagens.forEach((image: ImageDTO) => {
         formData.append("attachments[]", {
-          ...image,
-          uri: image,
-          name: `image_${new Date().getTime()}.jpg`,
-          type: "image/jpeg",
+          uri: image.uri,
+          name: image.name,
+          type: image.type,
         } as any);
       });
-      formData.append("appeal_end_date", "2024-08-26");
-      console.log(formData);
+      formData.append("appeal_end_date", dBAutuacao.data);
+
+      //console.log("Checklist salvo", JSON.stringify(formData, null, 2));
 
       await server.postForm(`/violations`, formData);
       await delDatabaseViolationId(dBAutuacao.id);
-      Alert.alert("Sucesso", "Autuação enviado com sucesso!");
+      Toast.show({
+        type: "success",
+        text1: "Autuação enviado com sucesso!",
+      });
       fetchViolations();
       // Função para trazer os dados da tabela autuacoes
       const response = await getDatabaseViolations();
       setAutuacoes(response);
     } catch (error) {
-      Alert.alert("Algo deu errado!", "Tente novamente!");
+      Toast.show({
+        type: "error",
+        text1: "Algo deu errado.",
+        text2: `Tente novamente!`,
+      });
     } finally {
-      setIsLoaded(false)
+      setIsLoaded(false);
     }
+  };
+  // Confirma se o usuario quer Deletar a autuação selecionada no banco
+  const ConfirmDelViolationSelected = () => {
+    Alert.alert("Atenção!", "Tem certeza que deseja excluir essa autuação?", [
+      { text: "Cancelar", style: "cancel" },
+      { text: "Excluir", onPress: () => delViolationSelected() },
+    ]);
   };
   // Deleta a autuação selecionada no banco
   const delViolationSelected = async () => {
-    setModal(MODAL.NONE)
-    setIsLoaded(true)
+    setModal(MODAL.NONE);
+    setIsLoaded(true);
     try {
-      await delDatabaseViolationId(dBAutuacao.id)
+      await delDatabaseViolationId(dBAutuacao.id);
       await getViolations();
       Alert.alert("Aviso!", "Autuação excluída com sucesso!");
     } catch (error) {
       Alert.alert("Algo deu errado!", "Tente novamente!");
     } finally {
-      setIsLoaded(false)
+      setIsLoaded(false);
     }
   };
   // Função para receber as autuações do fiscal logado
   async function fetchViolations() {
+    setIsLoaded(true);
+    await getViolations();
     try {
-      setIsLoaded(true);
       const { data } = await server.get(`/agent/${user.id}/violations`);
-
       setViolations(data.violations);
     } catch (error) {
-      throw error;
     } finally {
-      // Consulta as autuações no bando
-      const response = await getDatabaseViolations();
-      setAutuacoes(response);
       setIsLoaded(false);
     }
   }
   // Função para buscar as autuações no banco
   async function getViolations() {
-    setIsLoaded(true);
     try {
       // Consulta as autuações no bando
       const response = await getDatabaseViolations();
       setAutuacoes(response);
     } catch (error) {
-      setIsLoaded(false);
-      throw error;
-    } finally {
-      setIsLoaded(false);
+      Alert.alert("Atenção!", "Erro ao buscar as autuações no banco!");
     }
   }
-
+  // Chama a função fetchViolations sempre que entra na tela
   useFocusEffect(
     useCallback(() => {
-      setIsFocused(true); // Está focado.
-      return () => {
-        setIsFocused(false); // Não está focado.
-      };
+      fetchViolations();
+      return () => {};
     }, [])
   );
-  // Verifica a conexão
-  useEffect(() => {
-    isConnect && isFocused ? fetchViolations() : getViolations()
-  }, [isConnect, isFocused])
 
   return (
     <View className="flex-1">
       <HeaderBack title="Histórico de Autuações" variant="primary" />
-
-      <View className="m-4">
-        <MaterialCommunityIcons
-          name="circle"
-          size={24}
-          color={isConnect ? "green" : "red"}
-        />
-      </View>
+      {isLoaded && <LoadingLight />}
       {autuacoes[0] ? (
-        <View className="mx-4">
-          <Text className="text-gray-500 font-regular text-2xl font-bold">
-            Autuações Pendentes ({autuacoes.length}):
-          </Text>
-        </View>
+        <>
+          <View className="mt-4 mx-4">
+            <Text className="text-gray-500 font-regular text-2xl font-bold">
+              Autuações Pendentes ({autuacoes.length}):
+            </Text>
+          </View>
+          <DataTableOff data={autuacoes} onSend={handleOption} />
+        </>
       ) : (
-        <View className="mx-4 mb-4 bg-white border-2 rounded-md border-gray-300">
+        <View className="m-4 bg-white border-2 rounded-md border-gray-300">
           <View className="border-b-2 border-gray-300">
             <Text className="ml-2 my-2 text-gray-500 font-regular text-2xl font-bold">
               Aviso!
@@ -179,46 +200,46 @@ export default function HistoricoAutuacoes() {
         </View>
       )}
 
-      {autuacoes[0] ? (
-        <DataTableOff data={autuacoes} onSend={handleOption} />
+      {violations ? (
+        <>
+          <View className="mx-4">
+            <Text className="text-gray-500 font-regular text-2xl font-bold">
+              Autuações Enviadas ({violations.length}):
+            </Text>
+          </View>
+          <DataTable data={violations} onEdit={handleEdit} type="violation" />
+        </>
       ) : (
         <></>
       )}
-      {violations && isConnect ? (
-        <View className="mx-4">
-          <Text className="text-gray-500 font-regular text-2xl font-bold">
-            Autuações Enviadas ({violations.length}):
-          </Text>
-        </View>
-      ) : (
-        <></>
-      )}
-      {violations && isConnect ? <DataTable data={violations} onEdit={handleEdit} /> : <></>}
 
       <View className="m-4">
-        <Button variant="primary" onPress={() => router.push("/fiscal/violation")}>
+        <Button
+          variant="primary"
+          onPress={() => router.push("/fiscal/violation")}
+        >
           <Button.TextButton title="Cadastrar Autuação" />
         </Button>
       </View>
 
-      <Modal
-        className="bg-gray-200"
-        variant="primary"
-        visible={modal === MODAL.OPTIONS}
-        onClose={() => setModal(MODAL.NONE)}
-      >
-        <View className="flex-1 justify-center">
+      <Modal isOpen={modal === MODAL.OPTIONS}>
+        <View className="bg-white w-full p-4 rounded-xl">
           <View className="gap-5">
             <Button variant="primary" onPress={() => sendViolationSelected()}>
               <Button.TextButton title="Enviar" />
             </Button>
-            <Button variant="primary" onPress={() => delViolationSelected()}>
+            <Button
+              variant="primary"
+              onPress={() => ConfirmDelViolationSelected()}
+            >
               <Button.TextButton title="Excluir" />
+            </Button>
+            <Button variant="primary" onPress={() => setModal(MODAL.NONE)}>
+              <Button.TextButton title="Fechar" />
             </Button>
           </View>
         </View>
       </Modal>
-      {isLoaded ? <Loading /> : <></>}
     </View>
   );
 }
