@@ -1,6 +1,5 @@
 import React, { useContext, useEffect, useState } from "react";
 import {
-  ScrollView,
   View,
   Text,
   FlatList,
@@ -9,10 +8,12 @@ import {
   Alert,
   Modal,
   TouchableOpacity,
+  Keyboard,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import * as MediaLibrary from "expo-media-library";
 import { useRouter } from "expo-router";
+import { useForm, Controller } from "react-hook-form";
+import colors from "tailwindcss/colors";
 
 import { useAuth } from "@/hooks/useAuth";
 
@@ -25,13 +26,18 @@ import { InspectionItem } from "@/components/inspectionItem";
 import { DropdownButton } from "@/components/buttonDropdown";
 import { VehicleDTO } from "@/dtos/vehicleDTO";
 import { PermitHolderDTO } from "@/dtos/permitHolderDTO";
-import { InspectionItemDTO } from "@/dtos/inspectionItemDTO";
 import { NetworkContext } from "@/contexts/NetworkContext";
 import { getDatabaseInspectionLocation } from "@/database/InspectionLocation";
 import { getDatabaseReason, getDatabaseReasonItemId } from "@/database/reason";
 import { addDatabaseInspection } from "@/database/inspection";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { colors } from "@/styles/colors";
+import { Holder } from "@/components/Holder";
+import { ImageDTO } from "@/dtos/imageDTO";
+import { CameraSave } from "@/components/CameraSave";
+import { GalleryPick } from "@/components/GalleryPick";
+import { Search } from "@/components/search";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import Toast from "react-native-toast-message";
 
 enum MODAL {
   NONE = 0,
@@ -39,6 +45,14 @@ enum MODAL {
   VISTORIA = 2,
   LOCAIS = 3,
 }
+
+type FormData = {
+  numero: string;
+  vistoria: number;
+  local: string;
+  infracoes: number[];
+  status: string;
+};
 
 export default function Vistoria() {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -49,9 +63,21 @@ export default function Vistoria() {
 
   const { user } = useAuth();
 
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+    getValues,
+    setValue,
+    clearErrors,
+  } = useForm<FormData>();
+
   // Informações do Veiculo
   const [vehicle, setVehicle] = useState<VehicleDTO>();
-  const [numero, setNumero] = useState("");
+  const [permitType, setPermitType] = useState<string>("");
+  // ID do alvará
+  const [alvara, setAlvara] = useState<number>();
+
   // Dados do Condutor/Infrator
   const [permitHolder, setPermitHolder] = useState<PermitHolderDTO>();
   // Motivos da vistoria
@@ -62,33 +88,38 @@ export default function Vistoria() {
   // Locais
   const [listLocations, setListLocations] = useState([]);
   const [locations, setLocations] = useState<any>();
+  // Status
+  const [status, setStatus] = useState<any>();
   // Propaganda
   const [advertising, setAdvertising] = useState("");
   // Obserções
   const [obs, setObs] = useState("");
 
   // Itens da vitoria
-  const [inspectionItems, setInspectionItems] = useState<InspectionItemDTO[]>(
-    []
-  );
+  const [inspectionItems, setInspectionItems] = useState<any>([]);
+  const [inspectionItemsObject, setInspectionItemsObject] = useState<any>(null);
 
   // Imagens
   const [imagens, setImagens] = useState<ImagePicker.ImagePickerResult[] | any>(
     []
   );
-  const [imagensOff, setImagensOff] = useState<string[]>([]);
 
   // Modal
   const [modal, setModal] = useState(MODAL.NONE);
 
   // Buscar veículo
   async function searchPlate(req: any) {
+    Keyboard.dismiss();
     try {
       setIsLoaded(true);
       const { data } = await server.get(`/vehicle/${req}`);
+      // console.log(JSON.stringify(data, null, 2));
+
       const { permit_holder_id, vehicle_id } = data;
+      setAlvara(data.permit_id);
       setVehicle(vehicle_id);
       setPermitHolder(permit_holder_id);
+      setPermitType(data.permit_type.name);
     } catch (error) {
       setIsLoaded(false);
       Alert.alert("Algo deu errado!", "Tente novamente!");
@@ -139,8 +170,8 @@ export default function Vistoria() {
           item: data.item,
           description: data.description,
           additional_info: "",
-          status: "",
-          exists: false,
+          status: "apto",
+          exists: true,
         };
       });
       setInspectionItems(result);
@@ -161,105 +192,27 @@ export default function Vistoria() {
     // console.log(item);
     setLocations(item);
   }
+  // Função recebe os dados do local selecionado
+  function onSelectStatus(item: any) {
+    // console.log(item);
+    setStatus(item);
+  }
 
-  // Função para tirar foto
-  const takePhoto = async () => {
-    const pickerResult = await ImagePicker.launchCameraAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [4, 2],
-      quality: 1,
-    });
-
-    if (!pickerResult.canceled) {
-      let img = {
-        uri: pickerResult.assets[0].uri,
-        name: new Date().getTime() + ".jpeg",
-        type: "image/jpeg",
-      };
-      setImagens([...imagens, img]);
-      if (!isConnect) saveImage(img.uri);
-    }
-  };
-
-  // Salva a foto na galeria
-  const saveImage = async (uri: string) => {
-    // Solicitar permissão para gerenciar mídia
-    const { status } = await MediaLibrary.requestPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permissão necessária",
-        "Precisamos de permissão para salvar a imagem."
-      );
-      return;
-    }
-
-    try {
-      // Salvar a imagem no álbum específico
-      const asset = await MediaLibrary.createAssetAsync(uri);
-
-      // Verificar se o álbum já existe
-      let album = await MediaLibrary.getAlbumAsync("appFiscal");
-
-      if (!album) {
-        album = await MediaLibrary.createAlbumAsync("appFiscal", asset, false);
-        alert("Imagem salva com sucesso!");
-      } else {
-        await MediaLibrary.addAssetsToAlbumAsync([asset], album.id, false);
-      }
-      // Buscar as fotos do álbum
-      const { assets } = await MediaLibrary.getAssetsAsync({
-        album: album.id,
-        mediaType: "photo",
-      });
-
-      let img = assets.filter((item) => item.filename === asset.filename);
-
-      setImagensOff([...imagensOff, img[0].uri]);
-    } catch (error) {
-      alert("Erro ao salvar a imagem!");
-    }
-  };
-
-  // Função para selecinar imagem da galeria
-  const pickImage = async () => {
-    let pickerResult = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [4, 2],
-      quality: 1,
-    });
-    // console.log(pickerResult);
-
-    if (!pickerResult.canceled) {
-      let img = {
-        uri: pickerResult.assets[0].uri,
-        name: new Date().getTime() + ".jpeg",
-        type: "image/jpeg",
-      };
-      isConnect
-        ? setImagens([...imagens, img])
-        : setImagensOff([...imagensOff, img.uri]);
-    }
+  // Recebe os dados da imagem e salva no array
+  const saveImage = async (img: ImageDTO) => {
+    setImagens((prev) => [...prev, img]);
   };
 
   // Função para remover imagem
   const removerImagem = (index: number) => {
-    if (isConnect) {
-      let upImagens = [...imagens.slice(0, index), ...imagens.slice(index + 1)];
-      setImagens(upImagens);
-    } else {
-      let upImagensOff = [
-        ...imagensOff.slice(0, index),
-        ...imagensOff.slice(index + 1),
-      ];
-      setImagensOff(upImagensOff);
-    }
-    if (imagens.length < 1) setModal(MODAL.NONE);
-    if (imagensOff.length < 1) setModal(MODAL.NONE);
+    setImagens((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      if (updated.length < 1) setModal(MODAL.NONE);
+      return updated;
+    });
   };
 
-  async function postInspection() {
+  async function postInspection(data: FormData) {
     setIsLoaded(true);
     let currentdate = new Date();
     let date =
@@ -276,42 +229,45 @@ export default function Vistoria() {
       ":" +
       currentdate.getSeconds();
 
-    let data = new FormData();
-    data.append("permit_id", `1`);
-    data.append("permit_holder_id", `${permitHolder?.id}`);
-    data.append("vehicle_id", `${vehicle?.id}`);
-    data.append("user_id", `${user.id}`);
-    data.append("inspection_location_id", `${locations.value}`);
-    data.append("inspection_reason_id", `${inspectionReason}`);
-    data.append("auto_number", `20423`);
-    data.append("inspection_date", `${date}`);
-    data.append("inspection_time", `${time}`);
-    data.append("advertising", `${advertising}`);
-    data.append("final_observations", `${obs}`);
-    data.append("inspection_items", JSON.stringify(inspectionItems));
-    data.append("inspection_result", "");
-    imagens.forEach((image: any, index: number) => {
-      data.append("attachments[]", {
+    let formData = new FormData();
+    formData.append("permit_id", `${alvara}`);
+    formData.append("permit_holder_id", `${permitHolder?.id}`);
+    formData.append("vehicle_id", `${vehicle?.id}`);
+    formData.append("user_id", `${user.id}`);
+    formData.append("inspection_location_id", `${locations.value}`);
+    formData.append("inspection_reason_id", `${inspectionReason}`);
+    formData.append("inspection_date", `${date}`);
+    formData.append("inspection_time", `${time}`);
+    formData.append("advertising", `${advertising}`);
+    formData.append("final_observations", `${obs ? obs : "Sem observações"}`);
+    formData.append("inspection_items", JSON.stringify(inspectionItemsObject));
+    formData.append("inspection_result", `${status.value}`);
+    imagens.forEach((image: ImageDTO) => {
+      formData.append("attachments[]", {
         ...image,
         uri: image.uri,
-        name: `image_${index}.jpg`,
-        type: "image/jpeg",
+        name: image.name,
+        type: image.type,
       } as any);
     });
 
+    //console.log("Checklist salvo", JSON.stringify(formData, null, 2));
+
     try {
-      await server.postForm(`/inspections`, data);
-      setIsLoaded(false);
-      Alert.alert("Sucesso", "Vistoria enviado com sucesso!", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      await server.postForm(`/inspections`, formData);
+      Toast.show({
+        type: "success",
+        text1: "Vistoria enviado com sucesso!",
+      });
+      router.back();
     } catch (error) {
-      setIsLoaded(false);
       console.log(error);
+      addInspection(data);
+    } finally {
+      setIsLoaded(false);
     }
   }
-  async function addInspection() {
-    setIsLoaded(true);
+  async function addInspection(form: FormData) {
     let currentdate = new Date();
     let date =
       +currentdate.getFullYear() +
@@ -329,28 +285,33 @@ export default function Vistoria() {
 
     let inspection = [
       {
-        permitHolderId: "1",
-        vehicle: numero,
+        permitHolderId: permitHolder?.id,
+        vehicle: form.numero,
         inspectionLocationId: locations.value,
         inspectionReasonId: inspectionReason,
         data: date,
         hora: time,
         advertising: advertising,
-        obs: obs,
-        items: JSON.stringify(inspectionItems),
-        imagens: imagensOff,
-        status: "pendente",
+        obs: `${obs ? obs : "Sem observações"}`,
+        items: inspectionItems,
+        imagens: imagens,
+        status: `${status.value}`,
       },
     ];
 
     try {
       await addDatabaseInspection(inspection);
-      setIsLoaded(false);
-      Alert.alert("Sucesso", "Vistoria salvo com sucesso!", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      Toast.show({
+        type: "success",
+        text1: "Vistoria salvo offline!",
+      });
+      router.back();
     } catch (error) {
-      setIsLoaded(false);
+      Toast.show({
+        type: "error",
+        text1: "Algo deu errado!",
+        text2: "Não foi possível salvar!",
+      });
       console.log(error);
     }
   }
@@ -358,8 +319,26 @@ export default function Vistoria() {
   const handleSave = (updatedData: any) => {
     // Aqui você pode mandar pra API
     setModal(MODAL.NONE);
+
     setInspectionItems(updatedData);
-    //console.log("Checklist atualizado:", updatedData);
+
+    // console.log("Checklist atualizado:", updatedData);
+
+    let inspectionItemss = {};
+
+    updatedData.forEach((item) => {
+      inspectionItemss[item.id] = {
+        item: item.item,
+        additional_info: item.additional_info,
+        status: item.status,
+        exists: item.exists,
+      };
+    });
+
+    // console.log(inspectionItems);
+
+    setInspectionItemsObject(inspectionItemss);
+
     //Alert.alert("Checklist salvo", JSON.stringify(updatedData, null, 2));
   };
 
@@ -370,239 +349,190 @@ export default function Vistoria() {
 
   return (
     <>
-      <View className="flex-1">
+      <KeyboardAwareScrollView
+        enableOnAndroid
+        extraScrollHeight={40}
+        keyboardOpeningTime={0}
+        contentContainerStyle={{ paddingBottom: 40 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <HeaderBack title="Cadastrar Vistoria" variant="primary" />
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 100 }}
-        >
-          <View className="flex p-4">
-            {/* Consultar veículo */}
-            <View className="flex-row items-center mb-4">
-              <View className="flex-1">
+
+        <View className="flex p-4">
+          {/* Consultar veículo */}
+          <View className="flex-row items-center mb-3">
+            <View className="flex-1">
+              <Controller
+                control={control}
+                name="numero"
+                rules={{
+                  required: "Informe o Número do Veículo!",
+                }}
+                render={({ field: { onChange, value } }) => (
+                  <Search
+                    errorMessage={errors.numero?.message}
+                    placeholder="Número do Veículo"
+                    onChangeText={onChange}
+                    value={value}
+                    onSubmitEditing={() => searchPlate(value)}
+                    returnKeyType="send"
+                    keyboardType="numeric"
+                    onSearch={() => searchPlate(value)}
+                  />
+                )}
+              />
+            </View>
+          </View>
+
+          {/* Permissionário */}
+          <Holder permitHolder={permitHolder} vehicle={vehicle} />
+
+          {permitType !== "" && (
+            <View className="mb-4">
+              <View>
+                <Text className="text-gray-500 font-regular text-2xl font-bold">
+                  Tipo de Alvará
+                </Text>
                 <Field
                   variant="primary"
-                  placeholder="placa ou número"
-                  onChangeText={setNumero}
-                  onSubmitEditing={() => searchPlate(numero)}
-                  returnKeyType="send"
+                  placeholder={permitType}
+                  editable={false}
                 />
               </View>
             </View>
+          )}
 
-            {/* Informações do veículo */}
-            {vehicle?.id ? (
-              <View>
-                <Text className="mb-4 text-gray-500 font-regular text-2xl font-bold">
-                  Informações do Veículo:
-                </Text>
-                <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
-                  <View className="flex flex-row justify-between mb-4 gap-4">
-                    <View className="flex-1">
-                      <Text className="text-gray-500 font-regular text-2xl font-bold">
-                        Placa:
-                      </Text>
-                      <View className="bg-gray-300 rounded-md p-3">
-                        <Text className="font-semiBold text-lg">
-                          {vehicle.plate_number}
-                        </Text>
-                      </View>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-gray-500 font-regular text-2xl font-bold">
-                        Marca:
-                      </Text>
-                      <View className="bg-gray-300 rounded-md p-3">
-                        <Text className="font-semiBold text-lg">
-                          {vehicle.make}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View className="flex flex-row justify-between mb-4 gap-4">
-                    <View className="flex-1">
-                      <Text className="text-gray-500 font-regular text-2xl font-bold">
-                        Modelo:
-                      </Text>
-                      <View className="bg-gray-300 rounded-md p-3">
-                        <Text className="font-semiBold text-lg">
-                          {vehicle.model}
-                        </Text>
-                      </View>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-gray-500 font-regular text-2xl font-bold">
-                        Cor:
-                      </Text>
-                      <View className="bg-gray-300 rounded-md p-3">
-                        <Text className="font-semiBold text-lg">
-                          {vehicle.color}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View className="flex flex-row justify-between mb-4 gap-4">
-                    <View className="flex-1">
-                      <Text className="text-gray-500 font-regular text-2xl font-bold">
-                        Ano:
-                      </Text>
-                      <View className="bg-gray-300 rounded-md p-3">
-                        <Text className="font-semiBold text-lg">
-                          {vehicle.year}
-                        </Text>
-                      </View>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-gray-500 font-regular text-2xl font-bold">
-                        Renavam:
-                      </Text>
-                      <View className="bg-gray-300 rounded-md p-3">
-                        <Text className="font-semiBold text-lg">
-                          {vehicle.renavam.slice(0, 3)}*****
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            ) : (
-              <></>
-            )}
-            {/* Dados do Condutor/Infrator */}
-            {permitHolder?.id ? (
-              <View className="flex">
-                <Text className="mb-4 text-gray-500 font-regular text-2xl font-bold">
-                  Dados do Permissionário:
-                </Text>
-                <View className="bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
-                  <View className="flex flex-row justify-between mb-4 gap-4">
-                    <View className="flex-1">
-                      <Text className="text-gray-500 font-regular text-2xl font-bold">
-                        Nome:
-                      </Text>
-                      <View className="bg-gray-300 rounded-md p-3">
-                        <Text className="font-semiBold text-lg">
-                          {permitHolder.name}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View className="flex flex-row justify-between mb-4 gap-4">
-                    <View className="flex-1">
-                      <Text className="text-gray-500 font-regular text-2xl font-bold">
-                        CPF:
-                      </Text>
-                      <View className="bg-gray-300 rounded-md p-3">
-                        <Text className="font-semiBold text-lg">
-                          {permitHolder.cpf.slice(0, 3)}*****
-                        </Text>
-                      </View>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-gray-500 font-regular text-2xl font-bold">
-                        CNH:
-                      </Text>
-                      <View className="bg-gray-300 rounded-md p-3">
-                        <Text className="font-semiBold text-lg">
-                          {permitHolder.cnh.slice(0, 3)}*****
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            ) : (
-              <></>
-            )}
-
-            <View className="mb-4">
-              <Text className="mb-4 text-gray-500 font-regular text-2xl font-bold">
+          <View className="mb-4 gap-4">
+            <View>
+              <Text className="text-gray-500 font-regular text-2xl font-bold">
                 Motivo da Vistoria
               </Text>
-              <DropdownButton
-                data={inspectionOptions}
-                onSelect={onSelectInspection}
-                placeholder="Motivo da Vistoria"
+              <Controller
+                control={control}
+                name="vistoria"
+                rules={{ required: "Selecione o Motivo da Vistoria!" }}
+                render={({ field: { onChange, value } }) => (
+                  <DropdownButton
+                    data={[...inspectionOptions].sort((a, b) =>
+                      a.label.localeCompare(b.label)
+                    )}
+                    placeholder="Motivo da Vistoria"
+                    value={value} // ✅ agora mostra o valor selecionado
+                    errorMessage={errors.vistoria?.message} // ✅ mostra erro
+                    onSelect={(item) => {
+                      onChange(item.value); // ✅ atualiza o valor no formulário
+                      onSelectInspection(item); // ✅ mantém sua lógica atual também
+                    }}
+                  />
+                )}
               />
-              <Text className="mb-4 text-gray-500 font-regular text-2xl font-bold">
+            </View>
+            <View>
+              <Text className="text-gray-500 font-regular text-2xl font-bold">
                 Local da Vistoria
               </Text>
-              <DropdownButton
-                data={listLocations}
-                onSelect={onSelectLocation}
-                placeholder="Local da Vistoria"
-              />
-
-              {inspectionItems.length > 0 && (
-                <Button
-                  variant="primary"
-                  onPress={() => setModal(MODAL.VISTORIA)}
-                >
-                  <Button.TextButton title="Itens da Vistoria" />
-                </Button>
-              )}
-
-              {/* Imagens do Veiculo */}
-              <View className="flex flex-row justify-between my-4">
-                <View className="flex-1 mr-2">
-                  <Button variant="primary" onPress={() => takePhoto()}>
-                    <Button.TextButton title="Tirar foto" />
-                  </Button>
-                </View>
-                <View className="flex-1 ml-2">
-                  <Button variant="primary" onPress={() => pickImage()}>
-                    <Button.TextButton title="Abrir galeria" />
-                  </Button>
-                </View>
-              </View>
-              {/* Se houver imagem */}
-              {isConnect && imagens.length > 0 && (
-                <Button
-                  variant="primary"
-                  onPress={() => setModal(MODAL.IMAGENS)}
-                >
-                  <Button.TextButton title={`Imagens(${imagens.length})`} />
-                </Button>
-              )}
-              {!isConnect && imagensOff.length > 0 && (
-                <Button
-                  variant="primary"
-                  onPress={() => setModal(MODAL.IMAGENS)}
-                >
-                  <Button.TextButton title={`Imagens(${imagensOff.length})`} />
-                </Button>
-              )}
-              <Field
-                className="my-4"
-                variant="primary"
-                placeholder="Anúncio/Propaganda"
-                onChangeText={setAdvertising}
-                value={advertising}
-              />
-              <Field
-                className="my-4"
-                variant="primary"
-                placeholder="Observação"
-                onChangeText={setObs}
-                value={obs}
+              <Controller
+                control={control}
+                name="local"
+                rules={{ required: "Selecione o Local da Vistoria!" }}
+                render={({ field: { onChange, value } }) => (
+                  <DropdownButton
+                    data={[...listLocations].sort((a, b) =>
+                      a.label.localeCompare(b.label)
+                    )}
+                    placeholder="Local da Vistoria"
+                    value={value} // ✅ agora mostra o valor selecionado
+                    errorMessage={errors.local?.message} // ✅ mostra erro
+                    onSelect={(item) => {
+                      onChange(item.value); // ✅ atualiza o valor no formulário
+                      onSelectLocation(item); // ✅ mantém sua lógica atual também
+                    }}
+                  />
+                )}
               />
             </View>
 
-            {/* Salvar */}
-            {isConnect ? (
-              <Button variant="primary" onPress={() => postInspection()}>
-                <Button.TextButton title="ENVIAR" />
-              </Button>
-            ) : (
-              <Button variant="primary" onPress={() => addInspection()}>
-                <Button.TextButton title="SALVAR" />
+            {inspectionItems.length > 0 && (
+              <Button
+                className="mt-4"
+                variant="primary"
+                onPress={() => setModal(MODAL.VISTORIA)}
+              >
+                <Button.TextButton title="Itens da Vistoria" />
               </Button>
             )}
+
+            {/* Imagens do Veiculo */}
+            <View className="flex flex-row justify-between my-4">
+              <View className="flex-1 mr-2">
+                {/* Componente da camera */}
+                <CameraSave onChange={saveImage} />
+              </View>
+              <View className="flex-1 ml-2">
+                {/* Abrir Galeria */}
+                <GalleryPick onChange={saveImage} />
+              </View>
+            </View>
+
+            {/* Se houver imagem */}
+            {imagens.length > 0 ? (
+              <Button variant="primary" onPress={() => setModal(MODAL.IMAGENS)}>
+                <Button.TextButton title={`Imagens(${imagens.length})`} />
+              </Button>
+            ) : (
+              <></>
+            )}
+
+            <View>
+              <Text className="text-gray-500 font-regular text-2xl font-bold">
+                Status da Vistoria
+              </Text>
+              <Controller
+                control={control}
+                name="status"
+                rules={{ required: "Selecione o Status da Vistoria!" }}
+                render={({ field: { onChange, value } }) => (
+                  <DropdownButton
+                    data={[
+                      { label: "Aprovada", value: "Aprovada" },
+                      { label: "Reprovada", value: "Reprovada" },
+                    ]}
+                    placeholder="Status da Vistoria"
+                    value={value} // ✅ agora mostra o valor selecionado
+                    errorMessage={errors.status?.message} // ✅ mostra erro
+                    onSelect={(item) => {
+                      onChange(item.value); // ✅ atualiza o valor no formulário
+                      onSelectStatus(item); // ✅ mantém sua lógica atual também
+                    }}
+                  />
+                )}
+              />
+            </View>
+
+            {/* Observação */}
+            <View className="flex mb-5">
+              <Text className="text-gray-500 font-regular text-2xl font-bold">
+                Observação:
+              </Text>
+
+              <Field
+                placeholder="Descreva o assunto."
+                variant="primary"
+                onChangeText={setObs}
+                value={obs}
+                multiline={true}
+                numberOfLines={2}
+              />
+            </View>
           </View>
-        </ScrollView>
+
+          {/* Salvar */}
+          <Button variant="primary" onPress={handleSubmit(postInspection)}>
+            <Button.TextButton title="ENVIAR" />
+          </Button>
+        </View>
+
         <Modal
           visible={modal === MODAL.IMAGENS}
           animationType="slide"
@@ -616,22 +546,22 @@ export default function Vistoria() {
             >
               <MaterialCommunityIcons
                 name="close-circle-outline"
-                size={30}
+                size={40}
                 color={colors.blue[500]}
               />
             </TouchableOpacity>
             <FlatList
-              data={isConnect ? imagens : imagensOff}
+              data={imagens}
               renderItem={({ item, index }) => (
                 <View className="w-full mb-4 bg-white p-2 rounded-md border-gray-300 border-2">
-                  {isConnect ? (
-                    <Image
-                      className="h-56 rounded-md"
-                      source={{ uri: item.uri }}
-                    />
-                  ) : (
-                    <Image className="h-56 rounded-md" source={{ uri: item }} />
-                  )}
+                  <Image
+                    className="h-56 rounded-md"
+                    source={{
+                      uri: item.uri,
+                    }}
+                    resizeMode="contain"
+                  />
+
                   <Pressable
                     className="py-4 items-center"
                     onPress={() => removerImagem(index)}
@@ -661,7 +591,7 @@ export default function Vistoria() {
               >
                 <MaterialCommunityIcons
                   name="close-circle-outline"
-                  size={30}
+                  size={40}
                   color={colors.blue[500]}
                 />
               </TouchableOpacity>
@@ -671,7 +601,7 @@ export default function Vistoria() {
             )}
           </View>
         </Modal>
-      </View>
+      </KeyboardAwareScrollView>
       {isLoaded && <Loading />}
     </>
   );
