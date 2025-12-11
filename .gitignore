@@ -40,3 +40,6 @@ android/
 
 # build
 build*.apk
+
+# env
+.env
