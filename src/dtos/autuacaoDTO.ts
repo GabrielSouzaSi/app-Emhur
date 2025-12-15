@@ -1,0 +1,20 @@
+export type Data = {
+  id: number;
+  abordagem: string;
+  placa: string;
+  numero: string;
+  marca: string;
+  modelo: string;
+  tipo: string;
+  especie: string;
+  imagens: string[];
+  local: string;
+  data: string;
+  hora: string;
+  idInfracao: number;
+  nome: string;
+  cpf: string;
+  cnh: string;
+  uf: string;
+  obs: string;
+};

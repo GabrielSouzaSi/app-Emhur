@@ -1,0 +1,29 @@
+// comando para gerar a tabela
+// npx drizzle-kit generate
+
+import { sql } from "drizzle-orm";
+import { integer, numeric, sqliteTable, text } from "drizzle-orm/sqlite-core";
+
+export const violations = sqliteTable("violations", {
+    id: integer("id").primaryKey(),
+    vehicle: text("vehicle"), // placa ou numero
+    imagens: text("imagens", { mode: "json" })
+        .$type<{ uri: string; name: string; type: string }[]>()
+        .default(sql`(json_array())`),
+    local: text("local"),
+    driverTypeId: numeric("driverTypeId"),
+    driverName: text("driverName"),
+    driverCpf: text("driverCPF"),
+    driverCnh: text("driverCNH"),
+    signatureUri: text("signatureUri"),
+    latitude: text("latitude"),
+    longitude: text("longitude"),
+    data: text("data"),
+    hora: text("hora"),
+    approach: integer("approach"),
+    idInfracao: text("idInfracao", { mode: "json" })
+        .$type<number[]>()
+        .default(sql`(json_array())`),
+    obs: text("obs"),
+    status: text("status")
+})
