@@ -47,6 +47,11 @@ export default function HomeFiscal() {
 			route: "/(auth)/veiculo",
 		},
 		{
+			title: "Fisc. Fundiária",
+			icon: "home-outline",
+			route: "/(auth)/fiscalizacaoFundiaria",
+		},
+		{
 			title: "Frequência",
 			icon: "calendar-outline",
 			route: "/(auth)/frequency",
