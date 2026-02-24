@@ -3,168 +3,282 @@ import { useCallback, useState } from "react"
 import { Alert, Text, View } from "react-native"
 
 import { Button } from "@/components/button"
-import DataTable from "@/components/dataTable"
-import DataTableOff from "@/components/dataTableOff"
+import DataTableOffFundiary from "@/components/dataTableOffFundiary"
 import { HeaderBack } from "@/components/headerBack"
 import { LoadingLight } from "@/components/loading"
 import { Modal } from "@/components/RNModal"
-import { delDatabaseViolationId, getDatabaseViolations } from "@/database/violation"
+import {
+	delDatabaseFundiaryInspection,
+	getDatabaseFundiaryInspection,
+} from "@/database/fundiaryInspections"
 import { ImageDTO } from "@/dtos/imageDTO"
-import { useAuth } from "@/hooks/useAuth"
 import { server } from "@/server/api"
-import Toast from "react-native-toast-message"
 
 enum MODAL {
 	NONE = 0,
 	OPTIONS = 1,
 }
 
-export default function HistoricoAutuacoes() {
+type DBInspection = Record<string, any>
+
+/**
+ * Formato que o DataTableOffFundiary espera (offline / banco)
+ * (camelCase)
+ */
+export type Historico = {
+	id: number
+	serviceOrderNumber: string
+	processNumber: string
+	processYear: string
+	requesterName: string
+	requesterContact: string
+	address: string
+	addressNumber: string
+	lotNumber: string
+	blockNumber: string
+	areaRegistrationOwner: string
+	occupationTypeId: string
+	useTypeId: string
+	environmentalInfluenceTypeId: string
+	observations: string
+	frontPhotos: any
+	edificationPhotos: any
+	portPhotos: any
+	perspectivePhotos: any
+	extraPhotos: any
+	latitude: string
+	longitude: string
+}
+
+/**
+ * Formato que o backend espera
+ * (snake_case)
+ */
+type FundiaryInspectionForm = {
+	id?: number
+	service_order_number: string
+	process_number: string
+	process_year: string
+	requester_name: string
+	requester_contact: string
+	address: string
+	address_number: string
+	lot_number: string
+	block_number: string
+	area_registration_owner: string
+
+	occupation_type_id: string
+	use_type_id: string
+	environmental_influence_type_id: string
+
+	observations: string
+
+	front_photos: ImageDTO[]
+	edification_photos: ImageDTO[]
+	port_photos: ImageDTO[]
+	perspective_photos: ImageDTO[]
+	extra_photos: ImageDTO[]
+
+	latitude: string
+	longitude: string
+}
+
+const parsePhotos = (v: any): ImageDTO[] => {
+	if (Array.isArray(v)) return v
+	if (typeof v === "string") {
+		try {
+			const parsed = JSON.parse(v)
+			return Array.isArray(parsed) ? (parsed as ImageDTO[]) : []
+		} catch {
+			return []
+		}
+	}
+	return []
+}
+
+/**
+ * Normaliza QUALQUER linha do banco para o formato Historico (camelCase),
+ * para a tabela renderizar sem erro.
+ */
+const normalizeHistorico = (row: DBInspection): Historico => ({
+	id: Number(row.id ?? 0),
+
+	serviceOrderNumber: String(row.serviceOrderNumber ?? row.service_order_number ?? ""),
+	processNumber: String(row.processNumber ?? row.process_number ?? ""),
+	processYear: String(row.processYear ?? row.process_year ?? ""),
+
+	requesterName: String(row.requesterName ?? row.requester_name ?? ""),
+	requesterContact: String(row.requesterContact ?? row.requester_contact ?? ""),
+
+	address: String(row.address ?? ""),
+	addressNumber: String(row.addressNumber ?? row.address_number ?? ""),
+	lotNumber: String(row.lotNumber ?? row.lot_number ?? ""),
+	blockNumber: String(row.blockNumber ?? row.block_number ?? ""),
+
+	areaRegistrationOwner: String(row.areaRegistrationOwner ?? row.area_registration_owner ?? ""),
+
+	occupationTypeId: String(row.occupationTypeId ?? row.occupation_type_id ?? ""),
+	useTypeId: String(row.useTypeId ?? row.use_type_id ?? ""),
+	environmentalInfluenceTypeId: String(
+		row.environmentalInfluenceTypeId ?? row.environmental_influence_type_id ?? "",
+	),
+
+	observations: String(row.observations ?? "Sem observações"),
+
+	// aqui pode vir array ou string JSON ou null, então guardamos "cru"
+	frontPhotos: row.frontPhotos ?? row.front_photos ?? "[]",
+	edificationPhotos: row.edificationPhotos ?? row.edification_photos ?? "[]",
+	portPhotos: row.portPhotos ?? row.port_photos ?? "[]",
+	perspectivePhotos: row.perspectivePhotos ?? row.perspective_photos ?? "[]",
+	extraPhotos: row.extraPhotos ?? row.extra_photos ?? "[]",
+
+	latitude: String(row.latitude ?? ""),
+	longitude: String(row.longitude ?? ""),
+})
+
+/**
+ * Converte Historico (camelCase) -> FundiaryInspectionForm (snake_case),
+ * já parseando as fotos.
+ */
+const toApiForm = (h: Historico): FundiaryInspectionForm => ({
+	id: h.id,
+
+	service_order_number: h.serviceOrderNumber,
+	process_number: h.processNumber,
+	process_year: h.processYear,
+
+	requester_name: h.requesterName,
+	requester_contact: h.requesterContact,
+
+	address: h.address,
+	address_number: h.addressNumber,
+	lot_number: h.lotNumber,
+	block_number: h.blockNumber,
+
+	area_registration_owner: h.areaRegistrationOwner,
+
+	occupation_type_id: h.occupationTypeId,
+	use_type_id: h.useTypeId,
+	environmental_influence_type_id: h.environmentalInfluenceTypeId,
+
+	observations: h.observations ?? "Sem observações",
+
+	front_photos: parsePhotos(h.frontPhotos),
+	edification_photos: parsePhotos(h.edificationPhotos),
+	port_photos: parsePhotos(h.portPhotos),
+	perspective_photos: parsePhotos(h.perspectivePhotos),
+	extra_photos: parsePhotos(h.extraPhotos),
+
+	latitude: h.latitude,
+	longitude: h.longitude,
+})
+
+export default function HistoricoFiscalizacaoFundiaria() {
 	const [isLoaded, setIsLoaded] = useState(false)
 	const [modal, setModal] = useState(MODAL.NONE)
-	const { user } = useAuth()
-	const [violations, setViolations] = useState<any>()
-	const [autuacoes, setAutuacoes] = useState([])
-	const [dBAutuacao, setDBAutuacao] = useState<any>()
+
+	const [inspectionsFundiary, setInspectionsFundiary] = useState<Historico[]>([])
+	const [selectedInspection, setSelectedInspection] = useState<Historico | null>(null)
 
 	const router = useRouter()
 
-	// Função para visualizar a autuação selecionada
-	const handleEdit = (item: { id: string | number }) => {
-		router.push(`/(auth)/${item}`)
-	}
-	// Abre o modal para exibir as opções da autuação selecionada
-	const handleOption = (item: any) => {
-		setDBAutuacao(item)
+	const handleOption = (item: Historico) => {
+		setSelectedInspection(item)
 		setModal(MODAL.OPTIONS)
 	}
-	// Envia a autuação pendênte
-	const sendViolationSelected = async () => {
+
+	const sendFundiaryInspectionSelected = async () => {
+		if (!selectedInspection) return
+
 		setModal(MODAL.NONE)
 		setIsLoaded(true)
+
 		try {
-			const { data } = await server.get(`/vehicle/${dBAutuacao.vehicle}`)
+			const i = toApiForm(selectedInspection)
 
 			const formData = new FormData()
-			formData.append("permit_holder_id", `${data.permit_holder_id.id}`)
-			formData.append("user_id", `${user.id}`)
-			formData.append("vehicle_id", `${data.vehicle_id.id}`)
-			formData.append("approach_id", `${dBAutuacao.approach}`)
-			dBAutuacao.idInfracao.forEach((id) => {
-				formData.append("violation_code_id[]", id.toString())
-			})
-			formData.append("violation_date", dBAutuacao.data)
-			formData.append("violation_time", dBAutuacao.hora)
-			formData.append("latitude", `${dBAutuacao.latitude}`)
-			formData.append("longitude", `${dBAutuacao.longitude}`)
+			formData.append("service_order_number", i.service_order_number)
+			formData.append("process_number", i.process_number)
+			formData.append("process_year", i.process_year)
+			formData.append("requester_name", i.requester_name)
+			formData.append("requester_contact", i.requester_contact)
+			formData.append("address", i.address)
+			formData.append("address_number", i.address_number)
+			formData.append("lot_number", i.lot_number)
+			formData.append("block_number", i.block_number)
+			formData.append("area_registration_owner", i.area_registration_owner)
 
-			formData.append("driver_type_id", `${dBAutuacao.driverTypeId}`)
-			formData.append(
-				"driver_name",
-				`${
-					dBAutuacao.driverTypeId == "1"
-						? data.permit_holder_id.name
-						: dBAutuacao.driverName
-				}`,
-			)
-			formData.append(
-				"driver_cpf",
-				`${
-					dBAutuacao.driverTypeId == "1"
-						? data.permit_holder_id.cpf
-						: dBAutuacao.driverCpf
-				}`,
-			)
-			formData.append(
-				"driver_cnh",
-				`${
-					dBAutuacao.driverTypeId == "1"
-						? data.permit_holder_id.cnh
-						: dBAutuacao.driverCnh
-				}`,
-			)
+			formData.append("occupation_type_id", i.occupation_type_id)
+			formData.append("use_type_id", i.use_type_id)
+			formData.append("environmental_influence_type_id", i.environmental_influence_type_id)
 
-			formData.append("signature_base64", `${dBAutuacao.signatureUri}`)
-			formData.append("address", dBAutuacao.local)
-			formData.append("description", dBAutuacao.obs)
-			dBAutuacao.imagens.forEach((image: ImageDTO) => {
-				formData.append("attachments[]", {
-					uri: image.uri,
-					name: image.name,
-					type: image.type,
-				} as any)
-			})
-			formData.append("appeal_end_date", dBAutuacao.data)
+			formData.append("observations", i.observations)
 
-			//console.log("Checklist salvo", JSON.stringify(formData, null, 2));
+			i.front_photos.forEach((p) => formData.append("front_photos[]", p as any))
+			i.edification_photos.forEach((p) => formData.append("edification_photos[]", p as any))
+			i.port_photos.forEach((p) => formData.append("port_photos[]", p as any))
+			i.perspective_photos.forEach((p) => formData.append("perspective_photos[]", p as any))
+			i.extra_photos.forEach((p) => formData.append("extra_photos[]", p as any))
 
-			await server.postForm(`/violations`, formData)
-			await delDatabaseViolationId(dBAutuacao.id)
-			Toast.show({
-				type: "success",
-				text1: "Autuação enviado com sucesso!",
-			})
-			fetchViolations()
-			// Função para trazer os dados da tabela autuacoes
-			const response = await getDatabaseViolations()
-			setAutuacoes(response)
-		} catch (error) {
-			Toast.show({
-				type: "error",
-				text1: "Algo deu errado.",
-				text2: `Tente novamente!`,
-			})
+			formData.append("latitude", i.latitude)
+			formData.append("longitude", i.longitude)
+
+			formData.append("auto_number", "")
+			formData.append("inspection_date", "")
+			formData.append("inspection_time", "")
+
+			await server.postForm("/fundiary-inspections", formData)
+
+			if (i.id) await delDatabaseFundiaryInspection(i.id)
+
+			Alert.alert("Sucesso!", "Fiscalização enviada com sucesso!")
+			await getInspectionsFundiary()
+		} catch (error: any) {
+			console.log("ERRO ENVIO FUNDIÁRIA:", error?.response?.data ?? error)
+			Alert.alert("Algo deu errado!", "Tente novamente!")
 		} finally {
 			setIsLoaded(false)
 		}
 	}
-	// Confirma se o usuario quer Deletar a autuação selecionada no banco
-	const ConfirmDelViolationSelected = () => {
-		Alert.alert("Atenção!", "Tem certeza que deseja excluir essa autuação?", [
+
+	const confirmDeleteFundiaryInspection = () => {
+		if (!selectedInspection?.id) return
+
+		Alert.alert("Atenção!", "Tem certeza que deseja excluir essa fiscalização fundiária?", [
 			{ text: "Cancelar", style: "cancel" },
-			{ text: "Excluir", onPress: () => delViolationSelected() },
+			{ text: "Excluir", onPress: () => deleteFundiaryInspection() },
 		])
 	}
-	// Deleta a autuação selecionada no banco
-	const delViolationSelected = async () => {
+
+	const deleteFundiaryInspection = async () => {
+		if (!selectedInspection?.id) return
+
 		setModal(MODAL.NONE)
 		setIsLoaded(true)
+
 		try {
-			await delDatabaseViolationId(dBAutuacao.id)
-			await getViolations()
-			Alert.alert("Aviso!", "Autuação excluída com sucesso!")
+			await delDatabaseFundiaryInspection(selectedInspection.id)
+			await getInspectionsFundiary()
+			Alert.alert("Aviso!", "Fiscalização fundiária excluída com sucesso!")
 		} catch (error) {
 			Alert.alert("Algo deu errado!", "Tente novamente!")
 		} finally {
 			setIsLoaded(false)
 		}
 	}
-	// Função para receber as autuações do fiscal logado
-	async function fetchViolations() {
-		setIsLoaded(true)
-		await getViolations()
+
+	async function getInspectionsFundiary() {
 		try {
-			const { data } = await server.get(`/agent/${user.id}/violations`)
-			setViolations(data.violations)
+			const response = await getDatabaseFundiaryInspection()
+			setInspectionsFundiary((response as any[]).map(normalizeHistorico))
 		} catch (error) {
-		} finally {
-			setIsLoaded(false)
+			Alert.alert("Atenção!", "Erro ao buscar as fiscalizações fundiárias no banco!")
 		}
 	}
-	// Função para buscar as autuações no banco
-	async function getViolations() {
-		try {
-			// Consulta as autuações no bando
-			const response = await getDatabaseViolations()
-			setAutuacoes(response)
-		} catch (error) {
-			Alert.alert("Atenção!", "Erro ao buscar as autuações no banco!")
-		}
-	}
-	// Chama a função fetchViolations sempre que entra na tela
+
 	useFocusEffect(
 		useCallback(() => {
-			fetchViolations()
+			getInspectionsFundiary()
 			return () => {}
 		}, []),
 	)
@@ -172,15 +286,18 @@ export default function HistoricoAutuacoes() {
 	return (
 		<View className="flex-1">
 			<HeaderBack title="Histórico de Fiscalizações" variant="primary" />
+
 			{isLoaded && <LoadingLight />}
-			{autuacoes[0] ? (
+
+			{inspectionsFundiary[0] ? (
 				<>
 					<View className="mt-4 mx-4">
 						<Text className="text-gray-500 font-regular text-2xl font-bold">
-							Fiscalizações Pendentes ({autuacoes.length}):
+							Fiscalizações Pendentes ({inspectionsFundiary.length}):
 						</Text>
 					</View>
-					<DataTableOff data={autuacoes} onSend={handleOption} />
+
+					<DataTableOffFundiary data={inspectionsFundiary} onSend={handleOption} />
 				</>
 			) : (
 				<View className="m-4 bg-white border-2 rounded-md border-gray-300">
@@ -197,19 +314,6 @@ export default function HistoricoAutuacoes() {
 				</View>
 			)}
 
-			{violations ? (
-				<>
-					<View className="mx-4">
-						<Text className="text-gray-500 font-regular text-2xl font-bold">
-							Fiscalizações Enviadas ({violations.length}):
-						</Text>
-					</View>
-					<DataTable data={violations} onEdit={handleEdit} type="violation" />
-				</>
-			) : (
-				<></>
-			)}
-
 			<View className="m-4">
 				<Button variant="primary" onPress={() => router.push("/(auth)/fundiariaForm")}>
 					<Button.TextButton title="Fomulário" />
@@ -219,12 +323,14 @@ export default function HistoricoAutuacoes() {
 			<Modal isOpen={modal === MODAL.OPTIONS}>
 				<View className="bg-white w-full p-4 rounded-xl">
 					<View className="gap-5">
-						<Button variant="primary" onPress={() => sendViolationSelected()}>
+						<Button variant="primary" onPress={sendFundiaryInspectionSelected}>
 							<Button.TextButton title="Enviar" />
 						</Button>
-						<Button variant="primary" onPress={() => ConfirmDelViolationSelected()}>
+
+						<Button variant="primary" onPress={confirmDeleteFundiaryInspection}>
 							<Button.TextButton title="Excluir" />
 						</Button>
+
 						<Button variant="primary" onPress={() => setModal(MODAL.NONE)}>
 							<Button.TextButton title="Fechar" />
 						</Button>

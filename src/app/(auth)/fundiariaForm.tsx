@@ -1,26 +1,18 @@
 import * as Location from "expo-location"
 import { useRouter } from "expo-router"
-import * as ScreenOrientation from "expo-screen-orientation"
-import * as Sharing from "expo-sharing"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
 	Alert,
-	Dimensions,
 	FlatList,
 	Image,
-	InteractionManager,
-	Keyboard,
 	KeyboardAvoidingView,
 	Platform,
 	Pressable,
 	ScrollView,
 	Text,
-	TouchableOpacity,
 	View,
 } from "react-native"
-import ViewShot, { captureRef } from "react-native-view-shot"
 
-import debounce from "lodash.debounce"
 import { Controller, useForm } from "react-hook-form"
 
 import { Button } from "@/components/button"
@@ -31,33 +23,21 @@ import { HeaderBack } from "@/components/headerBack"
 import { Field } from "@/components/input"
 import { Loading } from "@/components/loading"
 import { Modal } from "@/components/modal"
-import { getDatabaseApproach } from "@/database/approach"
-import { addDatabaseViolation } from "@/database/violation"
-import { getDatabaseViolationCode } from "@/database/violationsCode"
+import { delDatabaseFundiaryInspection } from "@/database/fundiaryInspections"
+import { getDatabaseFundiaryOccupationType } from "@/database/fundiaryOccupationType"
+import { getDatabaseFundiaryUseType } from "@/database/fundiaryUseType"
 import { ImageDTO } from "@/dtos/imageDTO"
-import { PermitHolderDTO } from "@/dtos/permitHolderDTO"
-import { VehicleDTO } from "@/dtos/vehicleDTO"
-import { useAuth } from "@/hooks/useAuth"
 import { server } from "@/server/api"
-
-import { getDatabaseDriverType } from "@/database/driverTypes"
-import { getDatabasePermitType } from "@/database/permitType"
-import { saveSignatureAsPng } from "@/utils/file"
 import Toast from "react-native-toast-message"
 
 enum MODAL {
 	NONE = 0,
-	IMAGENS = 1,
-	INFRACAO = 2,
-	QR = 3,
-	QRCODE = 4,
-	SIGNATURE = 5,
+	FRONT_LOT_PHOTO = 1,
+	EDIFICATION_PHOTO = 2,
+	NUMBER_PORT_PHOTO = 3,
+	PERSPECTIVE_PHOTO = 4,
+	COMPLEMENTS_PHOTO = 5,
 }
-type ListCod = {
-	id: number
-	description: string
-}
-
 type FormData = {
 	numero: string
 	permitType: string
@@ -67,333 +47,235 @@ type FormData = {
 	infracoes: number[]
 }
 
+type FundiaryInspectionForm = {
+	service_order_number: string
+	process_number: string
+	process_year: string
+	requester_name: string
+	requester_contact: string
+	address: string
+	address_number: string
+	lot_number: string
+	block_number: string
+	area_registration_owner: string
+	occupation_type_id: string
+	use_type_id: string
+	environmental_influence_type_id: string
+}
+
 export default function Autuacaoes() {
 	const ref = useRef<any>(null)
-	const { width, height } = Dimensions.get("window")
 
 	// informação do usuário
-	const { user } = useAuth()
 
 	const [isLoaded, setIsLoaded] = useState(false)
 
-	const [codeQr, setCodeQr] = useState("")
-
 	const router = useRouter()
 
-	// Mode de Abordagem
-	const [approach, setApproach] = useState<any>([])
-	const [abordagem, setAbordagem] = useState<number>()
+	const [fundiaryOccupationType, setFundiaryOccupationType] = useState<
+		{ label: string; value: string }[]
+	>([])
+	const [fundiaryUseType, setFundiaryUseType] = useState<{ label: string; value: string }[]>([])
+	const [fundiaryEnvironmentalInfluenceType, setFundiaryEnvironmentalInfluenceType] = useState<
+		{ label: string; value: string }[]
+	>([])
 
-	// Tipo de Condutor
-	const [driverType, setDriverType] = useState<any>([])
+	// Coordenadas GPS
+	const [gps, setGps] = useState<Location.LocationObject | null>(null)
 
-	const qrCodeLock = useRef(false)
+	// Imagens
+	const [frontLotPhoto, setFrontLotPhoto] = useState<ImageDTO[]>([])
+	const [edificationPhoto, setEdificationPhoto] = useState<ImageDTO[]>([])
+	const [numberPortPhoto, setNumberPortPhoto] = useState<ImageDTO[]>([])
+	const [perspectivePhoto, setPerspectivePhoto] = useState<ImageDTO[]>([])
+	const [complementsPhoto, setComplementsPhoto] = useState<ImageDTO[]>([])
 
-	// Informações do Veiculo
-	const [vehicle, setVehicle] = useState<VehicleDTO>()
-	const [permitType, setPermitType] = useState<string>("")
-	const [permitTypeOption, setPermitTypeOption] = useState<any>([])
-	const [imagens, setImagens] = useState<ImageDTO[]>([])
-
-	// Condutor
-	const [condutor, setCondutor] = useState<any>(false)
-
-	const [driverTypeId, setDriverTypeId] = useState<any>("")
-
-	// Assistent
-	const [assistenteId, setAssistenteId] = useState<number>()
-	const [driverName, setDriverName] = useState<string>("")
-	const [driverCpf, setDriverCpf] = useState<string>("")
-	const [driverCnh, setDriverCnh] = useState<string>("")
-	const [refused, setRefused] = useState<boolean>(false)
-
-	// Dados da Infração
-	const [idInfracao, setIdInfracao] = useState<number[]>([])
-	const [textCod, setTextCod] = useState<string[]>([])
+	// Observações
 	const [obs, setObs] = useState("")
-
-	// Dados do Condutor/Infrator
-	const [permitHolder, setPermitHolder] = useState<PermitHolderDTO>()
 
 	// Modal
 	const [modal, setModal] = useState(MODAL.NONE)
-
-	// Recebe a lista de códigos
-	const [codigo, setCodigo] = useState<ListCod[]>([])
-	const [selecText, setSelecText] = useState<ListCod[]>([])
-
-	// Assinatura
-	const [signatureUri, setSignatureUri] = useState<string>("")
-	const [signaturePngUri, setSignaturePngUri] = useState<string>("")
-
-	const scrollRef = useRef<ScrollView>(null)
-	const containerRef = useRef<View>(null)
-	const [contentH, setContentH] = useState(0)
-
-	const viewShotRef = useRef<ViewShot>(null)
-
-	const handlePrintAndShare = useCallback(async () => {
-		Keyboard.dismiss()
-
-		await new Promise<void>((resolve) =>
-			InteractionManager.runAfterInteractions(() => resolve()),
-		)
-		await new Promise((r) => setTimeout(r, 350))
-
-		const uri = await captureRef(containerRef, {
-			format: "png",
-			quality: 1,
-			result: "tmpfile",
-		})
-
-		await Sharing.shareAsync(uri)
-	}, [])
 
 	const {
 		control,
 		handleSubmit,
 		formState: { errors },
-		setValue,
-		clearErrors,
-	} = useForm<FormData>()
+	} = useForm<FundiaryInspectionForm>({
+		defaultValues: {
+			service_order_number: "",
+			process_number: "",
+			process_year: "",
+			requester_name: "",
+			requester_contact: "",
+			address: "",
+			address_number: "",
+			lot_number: "",
+			block_number: "",
+			area_registration_owner: "",
+			occupation_type_id: "",
+			use_type_id: "",
+			environmental_influence_type_id: "",
+		},
+	})
 
-	// Busca as informações do veículo
-	async function searchPlate(req: any) {
-		Keyboard.dismiss()
-		try {
-			setIsLoaded(true)
-			const { data } = await server.get(`/vehicle/${req}`)
-			const { permit_holder_id, vehicle_id } = data
-			setVehicle(vehicle_id)
-			setPermitHolder(permit_holder_id)
-			setPermitType(data.permit_type.id.toString())
-		} catch (error) {
-			Toast.show({
-				type: "error",
-				text1: "Veículo não encontrado!",
-			})
-		} finally {
-			setIsLoaded(false)
+	// Recebe os dados das imagens e salva no estado
+	const saveImage = async (img: ImageDTO, modalType: MODAL) => {
+		switch (modalType) {
+			case MODAL.FRONT_LOT_PHOTO:
+				setFrontLotPhoto((prev) => [...prev, img])
+				break
+			case MODAL.EDIFICATION_PHOTO:
+				setEdificationPhoto((prev) => [...prev, img])
+				break
+			case MODAL.NUMBER_PORT_PHOTO:
+				setNumberPortPhoto((prev) => [...prev, img])
+				break
+			case MODAL.PERSPECTIVE_PHOTO:
+				setPerspectivePhoto((prev) => [...prev, img])
+				break
+			case MODAL.COMPLEMENTS_PHOTO:
+				setComplementsPhoto((prev) => [...prev, img])
+				break
 		}
 	}
-	// Busca as informações do Condutor
-	async function searchAssistentCPF(req: any) {
-		Keyboard.dismiss()
+
+	// Função para trazer os dados da tabela tipo de ocupação fundiária
+	async function getTableFundiaryOccupationType() {
 		try {
-			setIsLoaded(true)
-			const { data } = await server.get(`/assistant/${req}`)
-			setAssistenteId(data.id)
-			setDriverCpf(data.cpf)
-			setDriverCnh(data.cnh)
-			setDriverName(data.name)
-			Alert.alert("Sucesso", "Assistente encontrado!")
-		} catch (error) {
-			if (error.response) {
-				console.log("Erro da API:", error.response.data)
-				Alert.alert("Aviso", error.response.data.erro || "Erro desconhecido!")
-			} else {
-				console.log("Erro desconhecido:", error.message)
-				Alert.alert("Erro", "Não foi possível encontrar o condutor.")
-			}
-		} finally {
-			setIsLoaded(false)
-		}
-	}
-	// Função para trazer os dados da tabela infracoes
-	async function getViolationCode(type?: string | number) {
-		try {
-			const response = await getDatabaseViolationCode()
-
-			const filtered = response.filter((v: any) => v.permitTypes.some((p) => p.id == type))
-
-			let cod = await filtered.map((item: any) => {
-				return {
-					id: item.id,
-					description: `${item.code}: ${item.description}`,
-				}
-			})
-			setCodigo(cod)
-			setSelecText(cod)
-		} catch (error) {
-			console.log("fetchInfracoes =>" + error)
-		} finally {
-			setIsLoaded(false)
-		}
-	}
-	// Função para trazer os dados do tipo de condutor
-	async function getDriverType() {
-		try {
-			const response = await getDatabaseDriverType()
-			// console.log(response);
-
-			let result = response.map((item: any) => {
-				return {
-					value: `${item.id}`,
-					label: `${item.name}`,
-				}
-			})
-
-			setDriverType(result)
-		} catch (error) {
-			console.log("getViolationCode error =>" + error)
-		}
-	}
-	// Função para trazer os dados da tabela approach
-	async function getApproach() {
-		try {
-			const response = await getDatabaseApproach()
-
-			let optionApproach = response.map((data: any) => {
+			const data = await getDatabaseFundiaryOccupationType()
+			let result = data.map((data: any) => {
 				return {
 					label: data.name,
 					value: data.id,
 				}
 			})
-
-			setApproach(optionApproach)
+			setFundiaryOccupationType(result)
 		} catch (error) {
-			console.log("getApproach error =>" + error)
+			console.log(error)
 		}
 	}
-	// Função para trazer os dados da tabela permitType
-	async function getPermitType() {
-		try {
-			const response = await getDatabasePermitType()
 
-			let optionPermitType = response.map((data: any) => {
+	// Função para trazer os dados da tabela tipo de uso fundiário
+	async function getTableFundiaryUseType() {
+		try {
+			const data = await getDatabaseFundiaryUseType()
+			let result = data.map((data: any) => {
 				return {
 					label: data.name,
-					value: `${data.id}`,
+					value: data.id,
 				}
 			})
-
-			setPermitTypeOption(optionPermitType)
+			setFundiaryUseType(result)
 		} catch (error) {
-			console.log("getApproach error =>" + error)
+			console.log(error)
 		}
 	}
-	// Criar a autuacao
-	async function postViolation(data: FormData) {
+
+	// Função para remover imagem
+	const removerImagem = (modalType: MODAL, index: number) => {
+		switch (modalType) {
+			case MODAL.FRONT_LOT_PHOTO:
+				setFrontLotPhoto((prev) => prev.filter((_, i) => i !== index))
+				break
+			case MODAL.EDIFICATION_PHOTO:
+				setEdificationPhoto((prev) => prev.filter((_, i) => i !== index))
+				break
+			case MODAL.NUMBER_PORT_PHOTO:
+				setNumberPortPhoto((prev) => prev.filter((_, i) => i !== index))
+				break
+			case MODAL.PERSPECTIVE_PHOTO:
+				setPerspectivePhoto((prev) => prev.filter((_, i) => i !== index))
+				break
+			case MODAL.COMPLEMENTS_PHOTO:
+				setComplementsPhoto((prev) => prev.filter((_, i) => i !== index))
+				break
+		}
+	}
+
+	async function getGPS() {
+		const status = await statusGPS()
+		setGps(status)
+	}
+
+	async function handleSubmitForm(data: FundiaryInspectionForm) {
 		setIsLoaded(true)
-		let status = await statusGPS()
-		if (status) {
-			let loc: Location.LocationObject = status
-			let currentdate = new Date()
-			let date =
-				+currentdate.getFullYear() +
-				"-" +
-				(currentdate.getMonth() + 1) +
-				"-" +
-				currentdate.getDate()
 
-			let time =
-				currentdate.getHours() +
-				":" +
-				currentdate.getMinutes() +
-				":" +
-				currentdate.getSeconds()
+		const form = new FormData()
 
-			const formData = new FormData()
-			formData.append("permit_holder_id", `${permitHolder?.id}`)
-			formData.append("user_id", `${user.id}`)
-			formData.append("vehicle_id", `${vehicle?.id}`)
-			formData.append("approach_id", `${abordagem}`)
-			idInfracao.forEach((id) => {
-				formData.append("violation_code_id[]", id.toString())
-			})
-			formData.append("violation_date", date)
-			formData.append("violation_time", time)
-			formData.append("latitude", `${loc.coords.latitude}`)
-			formData.append("longitude", `${loc.coords.longitude}`)
-			formData.append("driver_type_id", `${driverTypeId}`)
-			formData.append(
-				"driver_name",
-				`${driverName === "" ? "Nome Não Informado" : driverName}`,
-			)
-			formData.append("driver_cpf", `${driverCpf === "" ? "CPF Não Informado" : driverCpf}`)
-			formData.append("driver_cnh", `${driverCnh === "" ? "CNH Não Informado" : driverCnh}`)
-			formData.append("signature_base64", signatureUri)
-			formData.append("address", data.local)
-			formData.append(
-				"description",
-				`${refused ? "O condutor se recusou a assinar o auto de infração. " : ""}${
-					obs || refused ? obs : "Sem observações"
-				}`,
-			)
-			imagens.forEach((image: ImageDTO) => {
-				formData.append("attachments[]", {
-					...image,
-					uri: image.uri,
-					name: image.name,
-					type: image.type,
-				} as any)
-			})
-			formData.append("appeal_end_date", date)
+		// ✅ campos do formulário (vindos do react-hook-form)
+		Object.entries(data).forEach(([key, value]) => {
+			form.append(key, value ?? "")
+		})
 
-			// console.log("formData => ", formData);
-			// let d = formData.getAll("violation_code_id[]");
-			// console.log(JSON.parse(JSON.stringify(d)));
+		// ✅ observações
+		form.append("observations", obs ? obs.trim() : "Sem observações")
 
-			//console.log("Checklist salvo", JSON.stringify(formData, null, 2));
+		// ✅ imagens
+		frontLotPhoto.forEach((photo) => form.append("front_photos[]", photo as any))
+		edificationPhoto.forEach((photo) => form.append("edification_photos[]", photo as any))
+		numberPortPhoto.forEach((photo) => form.append("port_photos[]", photo as any))
+		perspectivePhoto.forEach((photo) => form.append("perspective_photos[]", photo as any))
+		complementsPhoto.forEach((photo) => form.append("extra_photos[]", photo as any))
 
-			try {
-				// 1️⃣ Tenta enviar ao servidor
-				await server.postForm(`/violations`, formData)
-				Toast.show({
-					type: "success",
-					text1: "Autuação enviado com sucesso!",
-				})
-				router.back()
-			} catch (error: any) {
-				// 2️⃣ Se houver falha de rede ou servidor → salva offline
-				console.log("⚠️ Falha no envio, salvando offline:", error?.message)
-				await addViolation(data)
-			} finally {
-				setIsLoaded(false)
-			}
-		} else {
+		// ✅ gps
+		form.append("latitude", gps?.coords?.latitude?.toString() ?? "")
+		form.append("longitude", gps?.coords?.longitude?.toString() ?? "")
+
+		// ⚠️ corrigir nomes (você tem "inspection_tim" e campos vazios)
+		form.append("auto_number", "")
+		form.append("inspection_date", "")
+		form.append("inspection_time", "") // ✅ (corrigido)
+
+		try {
+			await server.postForm("/fundiary-inspections", form) // ✅ faltava await
+			Toast.show({ type: "success", text1: "Formulário enviado com sucesso!" })
+			router.back()
+		} catch (error: any) {
+			console.log("⚠️ Falha no envio, salvando offline:", error?.message)
+			handleSubmitFormOffline(data)
+		} finally {
 			setIsLoaded(false)
 		}
 	}
-	// Cadastra a autuação no banco
-	async function addViolation(form: FormData) {
+
+	async function handleSubmitFormOffline(data: FundiaryInspectionForm) {
 		try {
-			let loc = await statusGPS()
-			if (!loc) return
-
-			const currentdate = new Date()
-			const date = `${currentdate.getFullYear()}-${
-				currentdate.getMonth() + 1
-			}-${currentdate.getDate()}`
-			const time = `${currentdate.getHours()}:${currentdate.getMinutes()}:${currentdate.getSeconds()}`
-
-			const data = [
+			const save = [
 				{
-					vehicle: form.numero, // placa ou numero
-					imagens: imagens,
-					local: form.local,
-					driverTypeId,
-					driverName: `${driverName === "" ? "Nome Não Informado" : driverName}`,
-					driverCpf: `${driverCpf === "" ? "CPF Não Informado" : driverCpf}`,
-					driverCnh: `${driverCnh === "" ? "CNH Não Informado" : driverCnh}`,
-					signatureUri,
-					latitude: `${loc.coords.latitude}`,
-					longitude: `${loc.coords.longitude}`,
-					data: date,
-					hora: time,
-					approach: `${abordagem}`,
-					idInfracao: idInfracao,
-					obs: `${
-						refused ? "O condutor se recusou a assinar o auto de infração.\n" : ""
-					}${obs || refused ? obs : "Sem observações"}`,
-					status: "Pendente",
+					serviceOrderNumber: data.service_order_number,
+					processNumber: data.process_number,
+					processYear: data.process_year,
+
+					requesterName: data.requester_name,
+					requesterContact: data.requester_contact,
+
+					address: data.address,
+					addressNumber: data.address_number,
+					lotNumber: data.lot_number,
+					blockNumber: data.block_number,
+
+					areaRegistrationOwner: data.area_registration_owner,
+					observations: obs ? obs.trim() : "Sem observações",
+
+					occupationTypeId: data.occupation_type_id,
+					useTypeId: data.use_type_id,
+					environmentalInfluenceTypeId: data.environmental_influence_type_id,
+
+					frontPhotos: frontLotPhoto,
+					edificationPhotos: edificationPhoto,
+					portPhotos: numberPortPhoto,
+					perspectivePhotos: perspectivePhoto,
+					extraPhotos: complementsPhoto,
+
+					latitude: gps?.coords?.latitude?.toString() ?? "",
+					longitude: gps?.coords?.longitude?.toString() ?? "",
 				},
 			]
 
-			await addDatabaseViolation(data)
+			await delDatabaseFundiaryInspection(save)
 			Toast.show({
 				type: "success",
-				text1: "Autuação salvo offline!",
+				text1: "Dados salvos offline!",
 			})
 			router.back()
 		} catch (error) {
@@ -405,146 +287,6 @@ export default function Autuacaoes() {
 			console.log(error)
 		}
 	}
-
-	// filtra o cógigo conforme a pesquisa do usuário
-	const filter = useCallback(
-		debounce((text: string) => {
-			if (!text) {
-				setSelecText(codigo) // valor original
-				return
-			}
-
-			const lower = text.toLowerCase()
-
-			const filtered = codigo.filter((item: ListCod) =>
-				item.description.toLowerCase().includes(lower),
-			)
-
-			if (filtered.length === 0) {
-				setSelecText([{ id: 1000, description: "Sem resultados!" }] as any)
-				return
-			}
-
-			setSelecText(filtered)
-		}, 250),
-		[codigo],
-	)
-
-	// Função para pegar o tipo de alvará selecionado
-	const onSelectPermitType = (item: string) => {
-		getViolationCode(item)
-	}
-	// Função para preparar o componente RadioButton
-	const onSelectMode = (item: any) => {
-		console.log(permitHolder)
-
-		setAbordagem(item.value)
-		setDriverTypeId("1")
-		if (item.value === 2) {
-			setDriverName(permitHolder ? permitHolder.name : "")
-			setDriverCpf(permitHolder ? permitHolder.cpf : "")
-			setDriverCnh(permitHolder ? permitHolder.cnh : "")
-		}
-	}
-	// Função para pegar o tipo de condutor selecionado
-	const onSelectDriverType = (item: any) => {
-		setDriverTypeId(item)
-		console.log(permitHolder)
-
-		if (item === "1") {
-			setDriverName(permitHolder ? permitHolder.name : "")
-			setDriverCpf(permitHolder ? permitHolder.cpf : "")
-			setDriverCnh(permitHolder ? permitHolder.cnh : "")
-		}
-	}
-
-	{
-		/* renderItem otimizado */
-	}
-	const renderItem = useCallback(
-		({ item }) => {
-			const isSelected = idInfracao.includes(item.id)
-
-			return (
-				<TouchableOpacity
-					className={`rounded-md p-2 my-3 ${isSelected ? "bg-blue-500" : "bg-gray-300"}`}
-					onPress={() => onSelectData(item)}
-				>
-					<Text
-						className={`text-lg font-medium ${
-							isSelected ? "text-white" : "text-black"
-						}`}
-					>
-						{item.description}
-					</Text>
-				</TouchableOpacity>
-			)
-		},
-		[idInfracao], // só re-render se mudar a seleção
-	)
-
-	// Função recebe o código da infração selecionada
-	// Função para marcar/desmarcar seleção
-	function onSelectData(item: ListCod) {
-		clearErrors("infracoes")
-
-		// 👉 Se o item já está selecionado, desmarca tudo
-		if (idInfracao.includes(item.id)) {
-			setIdInfracao([])
-			setTextCod([])
-			setValue("infracoes", [], { shouldValidate: true })
-			return
-		}
-
-		// 👉 Caso contrário, seleciona APENAS ele
-		setIdInfracao([item.id])
-		setTextCod([item.description])
-
-		// ✅ Atualiza o formulário com o valor novo
-		setValue("infracoes", [item.id], { shouldValidate: true })
-	}
-	// Recebe os dados da imagem e salva no array
-	const saveImage = async (img: ImageDTO) => {
-		setImagens((prev) => [...prev, img])
-	}
-
-	// Função para remover imagem
-	const removerImagem = (index: number) => {
-		setImagens((prev) => {
-			const updated = prev.filter((_, i) => i !== index)
-			if (updated.length < 1) setModal(MODAL.NONE)
-			return updated
-		})
-	}
-
-	// Função chamada quando a assinatura é concluída
-	const handleSignature = async (signature: string) => {
-		//console.log("Base64 da assinatura:", signature);
-		setModal(MODAL.NONE)
-		setSignatureUri(signature)
-		const signaturepng = await saveSignatureAsPng(signature)
-		setSignaturePngUri(signaturepng)
-	}
-
-	// Função para limpar a assinatura
-	const handleClear = () => {
-		ref.current?.clearSignature()
-		if (signatureUri) {
-			setModal(MODAL.NONE)
-			setSignatureUri("")
-			setTimeout(() => {
-				setModal(MODAL.SIGNATURE)
-			}, 1200)
-		}
-	}
-	// Função para salvar a assinatura
-	const handleSave = () => ref.current?.readSignature()
-
-	useEffect(() => {
-		getApproach()
-		getPermitType()
-		getDriverType()
-	}, [])
 
 	// Solicitar permissão
 	async function getPermissionGPS() {
@@ -560,45 +302,24 @@ export default function Autuacaoes() {
 		}
 	}
 	// Verificar se o GPS está ativado
-	async function statusGPS() {
+	async function statusGPS(): Promise<Location.LocationObject | null> {
 		const isGPSEnabled = await Location.hasServicesEnabledAsync()
 
 		if (!isGPSEnabled) {
 			Alert.alert("GPS desativado", "Ative o GPS para capturar a localização.")
-			return false
-		} else {
-			// Capturar localização
-			const userLocation = await Location.getCurrentPositionAsync({
-				accuracy: Location.Accuracy.High,
-			})
-			// Armazena a localização no estado
-			return userLocation
+			return null
 		}
+
+		return await Location.getCurrentPositionAsync({
+			accuracy: Location.Accuracy.High,
+		})
 	}
 
 	useEffect(() => {
-		//getPermissionGPS()
+		getPermissionGPS()
+		getTableFundiaryOccupationType()
+		getTableFundiaryUseType()
 	}, [])
-
-	useEffect(() => {
-		if (permitType) {
-			onSelectPermitType(permitType)
-			setValue("permitType", permitType) // sincroniza com o formulário
-			clearErrors("permitType") // limpa erro
-		}
-	}, [permitType])
-
-	// 🔄 Bloqueia rotação ao abrir/fechar modal
-	useEffect(() => {
-		async function lockOrientation() {
-			if (modal === MODAL.SIGNATURE) {
-				await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
-			} else {
-				await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
-			}
-		}
-		lockOrientation()
-	}, [modal])
 
 	return (
 		<>
@@ -611,166 +332,342 @@ export default function Autuacaoes() {
 					contentContainerStyle={{ flexGrow: 1 }}
 					keyboardShouldPersistTaps="handled"
 				>
-					<View
-						ref={containerRef}
-						collapsable={false}
-						style={{ minHeight: contentH, backgroundColor: "#fff" }}
-					>
+					<View>
 						{/* Cabeçalho */}
 						<HeaderBack title="Formulário Fundiário" variant="primary" />
 
 						<View className="flex p-4">
+							{/* Nº da Ordem de Serviço e Nº do Processo */}
+							<View className="flex-row justify-between gap-4 mb-4">
+								<View className="flex-1">
+									<Text className="text-gray-500 font-regular text-2xl font-bold">
+										Ordem de Serviço:
+									</Text>
+									<Controller
+										control={control}
+										name="service_order_number"
+										rules={{ required: "Campo obrigatório!" }}
+										render={({ field: { onChange, value } }) => (
+											<Field
+												placeholder="Ordem de Serviço"
+												variant="primary"
+												onChangeText={onChange}
+												value={value}
+											/>
+										)}
+									/>
+									{errors.service_order_number?.message ? (
+										<Text className="text-red-500">
+											{errors.service_order_number.message}
+										</Text>
+									) : null}
+								</View>
+								<View className="flex-1">
+									<Text className="text-gray-500 font-regular text-2xl font-bold">
+										Nº do Processo:
+									</Text>
+									<Controller
+										control={control}
+										name="process_number"
+										rules={{ required: "Informe o nº do processo" }}
+										render={({ field: { onChange, value } }) => (
+											<Field
+												placeholder="Número do Processo"
+												variant="primary"
+												onChangeText={onChange}
+												value={value}
+											/>
+										)}
+									/>
+									{errors.process_number?.message ? (
+										<Text className="text-red-500">
+											{errors.process_number.message}
+										</Text>
+									) : null}
+								</View>
+							</View>
+
+							{/* Ano do Processo */}
 							<View className="flex mb-4">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
-									Nº do Processo:
+									Ano do Processo:
 								</Text>
-								<Field
-									placeholder="Número do Processo"
-									variant="primary"
-									//onChangeText={setProcessNumber}
-									//value={processNumber}
+								<Controller
+									control={control}
+									name="process_year"
+									rules={{ required: "Informe o ano do processo" }}
+									render={({ field: { onChange, value } }) => (
+										<Field
+											placeholder="Ano do Processo"
+											variant="primary"
+											onChangeText={onChange}
+											value={value}
+										/>
+									)}
 								/>
+								{errors.process_year?.message ? (
+									<Text className="text-red-500">
+										{errors.process_year.message}
+									</Text>
+								) : null}
 							</View>
+
+							{/* Requerente */}
 							<View className="flex mb-4">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
 									Requerente:
 								</Text>
-								<Field
-									placeholder="Nome do Requerente"
-									variant="primary"
-									//onChangeText={setProcessNumber}
-									//value={processNumber}
+								<Controller
+									control={control}
+									name="requester_name"
+									rules={{ required: "Informe o nome do requerente" }}
+									render={({ field: { onChange, value } }) => (
+										<Field
+											placeholder="Nome do Requerente"
+											variant="primary"
+											onChangeText={onChange}
+											value={value}
+										/>
+									)}
 								/>
+								{errors.requester_name?.message ? (
+									<Text className="text-red-500">
+										{errors.requester_name.message}
+									</Text>
+								) : null}
 							</View>
+
+							{/* Contato do Requerente */}
 							<View className="flex mb-4">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
 									Contato:
 								</Text>
-								<Field
-									placeholder="Número de Contato"
-									variant="primary"
-									//onChangeText={setProcessNumber}
-									//value={processNumber}
+								<Controller
+									control={control}
+									name="requester_contact"
+									rules={{
+										validate: (v) => {
+											if (!v || !v.trim()) return true // vazio = OK
+											return v.trim().length >= 8 || "Contato muito curto"
+										},
+									}}
+									render={({ field: { onChange, value } }) => (
+										<Field
+											placeholder="Contato do Requerente"
+											variant="primary"
+											onChangeText={onChange}
+											value={value}
+										/>
+									)}
 								/>
+								{errors.requester_contact?.message ? (
+									<Text className="text-red-500">
+										{errors.requester_contact.message}
+									</Text>
+								) : null}
 							</View>
+
+							{/* Endereço */}
 							<View className="flex mb-4">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
 									Endereço:
 								</Text>
-								<Field
-									placeholder="Endereço completo"
-									variant="primary"
-									//onChangeText={setProcessNumber}
-									//value={processNumber}
+								<Controller
+									control={control}
+									name="address"
+									rules={{ required: "Informe o endereço" }}
+									render={({ field: { onChange, value } }) => (
+										<Field
+											placeholder="Endereço completo"
+											variant="primary"
+											onChangeText={onChange}
+											value={value}
+										/>
+									)}
 								/>
+								{errors.address?.message ? (
+									<Text className="text-red-500">{errors.address.message}</Text>
+								) : null}
 							</View>
+
+							{/* Número do Endereço */}
 							<View className="flex mb-4">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
-									Nº:
+									Nº de Porta:
 								</Text>
-								<Field
-									placeholder="Número do Processo"
-									variant="primary"
-									//onChangeText={setProcessNumber}
-									//value={processNumber}
+								<Controller
+									control={control}
+									name="address_number"
+									rules={{ required: "Informe o número" }}
+									render={({ field: { onChange, value } }) => (
+										<Field
+											placeholder="Número do Endereço"
+											variant="primary"
+											onChangeText={onChange}
+											value={value}
+										/>
+									)}
 								/>
+								{errors.address_number?.message ? (
+									<Text className="text-red-500">
+										{errors.address_number.message}
+									</Text>
+								) : null}
 							</View>
+
+							{/* Lote e Quadra */}
 							<View className="flex mb-4">
 								<View className="flex-row justify-between gap-4">
 									<View className="flex-1">
 										<Text className="text-gray-500 font-regular text-2xl font-bold">
 											Nº do Lote:
 										</Text>
-										<Field
-											placeholder="Lote"
-											variant="primary"
-											//onChangeText={setLotNumber}
-											//onSubmitEditing={() => searchAssistentLote(lotNumber)}
-											//value={lotNumber}
+										<Controller
+											control={control}
+											name="lot_number"
+											rules={{ required: "Informe o número do lote" }}
+											render={({ field: { onChange, value } }) => (
+												<Field
+													placeholder="Número do Lote"
+													variant="primary"
+													onChangeText={onChange}
+													value={value}
+												/>
+											)}
 										/>
+										{errors.lot_number?.message ? (
+											<Text className="text-red-500">
+												{errors.lot_number.message}
+											</Text>
+										) : null}
 									</View>
+
 									<View className="flex-1">
 										<Text className="text-gray-500 font-regular text-2xl font-bold">
 											Nº do Quadra:
 										</Text>
-										<Field
-											placeholder="Quadra"
-											variant="primary"
-											//onChangeText={setNumberQuadra}
-											//value={numberQuadra}
+										<Controller
+											control={control}
+											name="block_number"
+											rules={{ required: "Informe o número da quadra" }}
+											render={({ field: { onChange, value } }) => (
+												<Field
+													placeholder="Número da Quadra"
+													variant="primary"
+													onChangeText={onChange}
+													value={value}
+												/>
+											)}
 										/>
+										{errors.block_number?.message ? (
+											<Text className="text-red-500">
+												{errors.block_number.message}
+											</Text>
+										) : null}
 									</View>
 								</View>
 							</View>
+
+							<Button className="mb-4" variant="primary" onPress={getGPS}>
+								<Button.TextButton title="Marcar Posição" />
+							</Button>
+
+							{gps && (
+								<View className="flex mb-4">
+									<Text className="text-gray-500 font-regular text-2xl font-bold">
+										Posição GPS: {gps?.coords?.latitude},{" "}
+										{gps?.coords?.longitude}
+									</Text>
+								</View>
+							)}
+
+							{/* Matrícula da Área/Proprietário */}
 							<View className="flex mb-4">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
 									Matricula da Área/Proprietário:
 								</Text>
-								<Field
-									placeholder="Número da Matrícula"
-									variant="primary"
-									//onChangeText={setProcessNumber}
-									//value={processNumber}
+								<Controller
+									control={control}
+									name="area_registration_owner"
+									// rules={{ required: "Informe a matrícula da área/proprietário" }}
+									render={({ field: { onChange, value } }) => (
+										<Field
+											placeholder="Matrícula da Área/Proprietário"
+											variant="primary"
+											onChangeText={onChange}
+											value={value}
+										/>
+									)}
 								/>
+								{errors.area_registration_owner?.message ? (
+									<Text className="text-red-500">
+										{errors.area_registration_owner.message}
+									</Text>
+								) : null}
 							</View>
 
 							{/* Tipo de Ocupação */}
-
 							<View className="mb-4">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
 									Tipo de Ocupação:
 								</Text>
 								<Controller
 									control={control}
-									name="driverType"
-									rules={{ required: "Selecione o tipo de Condutor!" }}
+									name="occupation_type_id"
+									rules={{ required: "Selecione o tipo de ocupação!" }}
 									render={({ field: { onChange, value } }) => (
 										<DropdownButton
-											data={[
-												{ label: "Requerente Mora", value: "1" },
-												{ label: "Alugado", value: "2" },
-												{ label: "Cedido", value: "3" },
-												{ label: "Outro", value: "4" },
-											]}
+											data={fundiaryOccupationType}
 											placeholder="Ocupação"
-											value={value} // ✅ agora mostra o valor selecionado
-											errorMessage={errors.driverType?.message} // ✅ mostra erro
-											onSelect={(item) => {
-												onChange(item.value) // ✅ atualiza o valor no formulário
-												onSelectDriverType(item.value) // ✅ mantém sua lógica atual também
-											}}
+											value={value}
+											errorMessage={errors.occupation_type_id?.message}
+											onSelect={(item) => onChange(item.value)}
 										/>
 									)}
 								/>
 							</View>
 
+							{/* Tipo de Uso */}
 							<View className="mb-4">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
 									Tipo de Uso:
 								</Text>
 								<Controller
 									control={control}
-									name="driverType"
-									rules={{ required: "Selecione o tipo de Uso!" }}
+									name="use_type_id"
+									rules={{ required: "Selecione o tipo de uso!" }}
 									render={({ field: { onChange, value } }) => (
 										<DropdownButton
-											data={[
-												{ label: "Residencial", value: "1" },
-												{ label: "Comercial", value: "2" },
-												{ label: "Misto", value: "3" },
-												{ label: "Abandonado", value: "4" },
-												{ label: "Baldio", value: "5" },
-												{ label: "Em Construção", value: "6" },
-												{ label: "Fechado", value: "7" },
-												{ label: "Outros", value: "8" },
-											]}
+											data={fundiaryUseType}
 											placeholder="Tipo de Uso"
-											value={value} // ✅ agora mostra o valor selecionado
-											errorMessage={errors.driverType?.message} // ✅ mostra erro
-											onSelect={(item) => {
-												onChange(item.value) // ✅ atualiza o valor no formulário
-												onSelectDriverType(item.value) // ✅ mantém sua lógica atual também
-											}}
+											value={value}
+											errorMessage={errors.use_type_id?.message}
+											onSelect={(item) => onChange(item.value)}
+										/>
+									)}
+								/>
+							</View>
+
+							{/* Influência Ambiental */}
+							<View className="mb-4">
+								<Text className="text-gray-500 font-regular text-2xl font-bold">
+									Tipo de Influência Ambiental:
+								</Text>
+								<Controller
+									control={control}
+									name="environmental_influence_type_id"
+									// rules={{
+									// 	required: "Selecione o tipo de influência ambiental!",
+									// }}
+									render={({ field: { onChange, value } }) => (
+										<DropdownButton
+											data={fundiaryEnvironmentalInfluenceType}
+											placeholder="Tipo de Influência Ambiental"
+											value={value}
+											errorMessage={
+												errors.environmental_influence_type_id?.message
+											}
+											onSelect={(item) => onChange(item.value)}
 										/>
 									)}
 								/>
@@ -781,11 +678,6 @@ export default function Autuacaoes() {
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
 									Observação:
 								</Text>
-								{refused && (
-									<Text className="text-white text-xl font-semiBold bg-blue-500 p-2 rounded-md mb-2">
-										O condutor se recusou a assinar o auto de infração.
-									</Text>
-								)}
 								<Field
 									placeholder="Descreva o assunto."
 									variant="primary"
@@ -795,58 +687,165 @@ export default function Autuacaoes() {
 								/>
 							</View>
 
-							<View className="flex mb-5">
+							{/* Imagens */}
+							<View className="flex">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
-									Frente do Lote:
+									Frente do Lote(Uma foto):
 								</Text>
 								<View className="flex flex-row justify-between my-4">
 									<View className="flex-1 mr-2">
 										{/* Componente da camera */}
-										<CameraSave onChange={saveImage} />
+										<CameraSave
+											onChange={(img) =>
+												saveImage(img, MODAL.FRONT_LOT_PHOTO)
+											}
+											disabled={frontLotPhoto.length >= 1} // Desabilita se já tiver uma foto
+										/>
 									</View>
 									<View className="flex-1 ml-2">
 										{/* Abrir Galeria */}
-										<GalleryPick onChange={saveImage} />
+										<GalleryPick
+											onChange={(img) =>
+												saveImage(img, MODAL.FRONT_LOT_PHOTO)
+											}
+											disabled={frontLotPhoto.length >= 1} // Desabilita se já tiver uma foto
+										/>
 									</View>
 								</View>
 
 								{/* Se houver imagem */}
-								{imagens.length > 0 ? (
+								{frontLotPhoto.length > 0 ? (
 									<Button
 										className="mb-4"
 										variant="primary"
-										onPress={() => setModal(MODAL.IMAGENS)}
+										onPress={() => setModal(MODAL.FRONT_LOT_PHOTO)}
 									>
-										<Button.TextButton title={`Imagens(${imagens.length})`} />
+										<Button.TextButton
+											title={`Imagens(${frontLotPhoto.length})`}
+										/>
 									</Button>
 								) : (
 									<></>
 								)}
 							</View>
 
-							<View className="flex mb-5">
+							<View className="flex">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
-									Edificação:
+									Foto do Nº de Porta(Uma foto):
 								</Text>
 								<View className="flex flex-row justify-between my-4">
 									<View className="flex-1 mr-2">
 										{/* Componente da camera */}
-										<CameraSave onChange={saveImage} />
+										<CameraSave
+											onChange={(img) =>
+												saveImage(img, MODAL.NUMBER_PORT_PHOTO)
+											}
+											disabled={numberPortPhoto.length >= 1} // Desabilita se já tiver uma foto
+										/>
 									</View>
 									<View className="flex-1 ml-2">
 										{/* Abrir Galeria */}
-										<GalleryPick onChange={saveImage} />
+										<GalleryPick
+											onChange={(img) =>
+												saveImage(img, MODAL.NUMBER_PORT_PHOTO)
+											}
+											disabled={numberPortPhoto.length >= 1} // Desabilita se já tiver uma foto
+										/>
 									</View>
 								</View>
 
 								{/* Se houver imagem */}
-								{imagens.length > 0 ? (
+								{numberPortPhoto.length > 0 ? (
 									<Button
 										className="mb-4"
 										variant="primary"
-										onPress={() => setModal(MODAL.IMAGENS)}
+										onPress={() => setModal(MODAL.NUMBER_PORT_PHOTO)}
 									>
-										<Button.TextButton title={`Imagens(${imagens.length})`} />
+										<Button.TextButton
+											title={`Imagens(${numberPortPhoto.length})`}
+										/>
+									</Button>
+								) : (
+									<></>
+								)}
+							</View>
+
+							<View className="flex">
+								<Text className="text-gray-500 font-regular text-2xl font-bold">
+									Edificação(Uma foto):
+								</Text>
+								<View className="flex flex-row justify-between my-4">
+									<View className="flex-1 mr-2">
+										{/* Componente da camera */}
+										<CameraSave
+											onChange={(img) =>
+												saveImage(img, MODAL.EDIFICATION_PHOTO)
+											}
+											disabled={edificationPhoto.length >= 1} // Desabilita se já tiver uma foto
+										/>
+									</View>
+									<View className="flex-1 ml-2">
+										{/* Abrir Galeria */}
+										<GalleryPick
+											onChange={(img) =>
+												saveImage(img, MODAL.EDIFICATION_PHOTO)
+											}
+											disabled={edificationPhoto.length >= 1} // Desabilita se já tiver uma foto
+										/>
+									</View>
+								</View>
+
+								{/* Se houver imagem */}
+								{edificationPhoto.length > 0 ? (
+									<Button
+										className="mb-4"
+										variant="primary"
+										onPress={() => setModal(MODAL.EDIFICATION_PHOTO)}
+									>
+										<Button.TextButton
+											title={`Imagens(${edificationPhoto.length})`}
+										/>
+									</Button>
+								) : (
+									<></>
+								)}
+							</View>
+
+							<View className="flex">
+								<Text className="text-gray-500 font-regular text-2xl font-bold">
+									Pespectiva:
+								</Text>
+								<View className="flex flex-row justify-between my-4">
+									<View className="flex-1 mr-2">
+										{/* Componente da camera */}
+										<CameraSave
+											onChange={(img) =>
+												saveImage(img, MODAL.PERSPECTIVE_PHOTO)
+											}
+											//disabled={edificationPhoto.length >= 1} // Desabilita se já tiver uma foto
+										/>
+									</View>
+									<View className="flex-1 ml-2">
+										{/* Abrir Galeria */}
+										<GalleryPick
+											onChange={(img) =>
+												saveImage(img, MODAL.PERSPECTIVE_PHOTO)
+											}
+											disabled={perspectivePhoto.length >= 1} // Desabilita se já tiver uma foto
+										/>
+									</View>
+								</View>
+
+								{/* Se houver imagem */}
+								{perspectivePhoto.length > 0 ? (
+									<Button
+										className="mb-4"
+										variant="primary"
+										onPress={() => setModal(MODAL.PERSPECTIVE_PHOTO)}
+									>
+										<Button.TextButton
+											title={`Imagens(${perspectivePhoto.length})`}
+										/>
 									</Button>
 								) : (
 									<></>
@@ -860,22 +859,32 @@ export default function Autuacaoes() {
 								<View className="flex flex-row justify-between my-4">
 									<View className="flex-1 mr-2">
 										{/* Componente da camera */}
-										<CameraSave onChange={saveImage} />
+										<CameraSave
+											onChange={(img) =>
+												saveImage(img, MODAL.COMPLEMENTS_PHOTO)
+											}
+										/>
 									</View>
 									<View className="flex-1 ml-2">
 										{/* Abrir Galeria */}
-										<GalleryPick onChange={saveImage} />
+										<GalleryPick
+											onChange={(img) =>
+												saveImage(img, MODAL.COMPLEMENTS_PHOTO)
+											}
+										/>
 									</View>
 								</View>
 
 								{/* Se houver imagem */}
-								{imagens.length > 0 ? (
+								{complementsPhoto.length > 0 ? (
 									<Button
 										className="mb-4"
 										variant="primary"
-										onPress={() => setModal(MODAL.IMAGENS)}
+										onPress={() => setModal(MODAL.COMPLEMENTS_PHOTO)}
 									>
-										<Button.TextButton title={`Imagens(${imagens.length})`} />
+										<Button.TextButton
+											title={`Imagens(${complementsPhoto.length})`}
+										/>
 									</Button>
 								) : (
 									<></>
@@ -883,7 +892,7 @@ export default function Autuacaoes() {
 							</View>
 
 							{/* Salvar */}
-							<Button variant="primary" onPress={handlePrintAndShare}>
+							<Button variant="primary" onPress={handleSubmit(handleSubmitForm)}>
 								<Button.TextButton title="ENVIAR" />
 							</Button>
 						</View>
@@ -895,12 +904,33 @@ export default function Autuacaoes() {
 			<Modal
 				className="bg-gray-200"
 				variant="primary"
-				visible={modal === MODAL.IMAGENS}
+				visible={
+					modal === MODAL.FRONT_LOT_PHOTO
+						? true
+						: modal === MODAL.EDIFICATION_PHOTO
+							? true
+							: modal === MODAL.NUMBER_PORT_PHOTO
+								? true
+								: modal === MODAL.COMPLEMENTS_PHOTO
+									? true
+									: false
+				}
 				onClose={() => setModal(MODAL.NONE)}
 			>
 				<View className="flex-1">
 					<FlatList
-						data={imagens}
+						data={
+							modal === MODAL.FRONT_LOT_PHOTO
+								? frontLotPhoto
+								: modal === MODAL.EDIFICATION_PHOTO
+									? edificationPhoto
+									: modal === MODAL.NUMBER_PORT_PHOTO
+										? numberPortPhoto
+										: modal === MODAL.COMPLEMENTS_PHOTO
+											? complementsPhoto
+											: []
+						}
+						keyExtractor={(_, index) => index.toString()}
 						renderItem={({ item, index }) => (
 							<View className="w-full mb-4 bg-white p-2 rounded-md border-gray-300 border-2">
 								<Image
@@ -913,7 +943,7 @@ export default function Autuacaoes() {
 
 								<Pressable
 									className="py-4 items-center"
-									onPress={() => removerImagem(index)}
+									onPress={() => removerImagem(modal, index)}
 								>
 									<Text className="text-red-500 font-semiBold text-lg">
 										Excluir
