@@ -3,6 +3,8 @@ import { Alert } from "react-native";
 
 import { delDatabaseApproach } from "@/database/approach";
 import { delDatabaseDriverType } from "@/database/driverTypes";
+import { delDatabaseFundiaryOccupationType } from "@/database/fundiaryOccupationType";
+import { delDatabaseFundiaryUseType } from "@/database/fundiaryUseType";
 import { delDatabaseInspectionLocation } from "@/database/InspectionLocation";
 import { delDatabasePermitType } from "@/database/permitType";
 import { delDatabaseReason } from "@/database/reason";
@@ -81,10 +83,12 @@ async function getAll() {
     try {
         const { data } = await server.get("/search-all");
 
-        const { approach, permitType } = data;
+        const { approach, permitType, fundiaryOccupationType, fundiaryUseType } = data;
 
         await delDatabaseApproach(approach);
         await delDatabasePermitType(permitType)
+        await delDatabaseFundiaryOccupationType(fundiaryOccupationType)
+        await delDatabaseFundiaryUseType(fundiaryUseType)
     } catch (error) {
         return "Dados de configuração do app";
     }
