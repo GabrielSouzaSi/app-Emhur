@@ -5,9 +5,10 @@ import { Button } from "./button"
 
 type GalleryPickProps = {
 	onChange?: (image: ImageDTO) => void // callback retorna o objeto da imagem
+	disabled?: boolean // desabilita o botão
 }
 
-export function GalleryPick({ onChange }: GalleryPickProps) {
+export function GalleryPick({ onChange, disabled }: GalleryPickProps) {
 	async function handlePickImage() {
 		try {
 			// 1️⃣ Solicita permissão de acesso à galeria
@@ -15,7 +16,7 @@ export function GalleryPick({ onChange }: GalleryPickProps) {
 			if (status !== "granted") {
 				Alert.alert(
 					"Permissão necessária",
-					"É necessário permitir o acesso à galeria para selecionar imagens."
+					"É necessário permitir o acesso à galeria para selecionar imagens.",
 				)
 				return
 			}
@@ -47,8 +48,11 @@ export function GalleryPick({ onChange }: GalleryPickProps) {
 	}
 
 	return (
-		<Button variant="primary" onPress={handlePickImage}>
-			<Button.TextButton title="Abrir Galeria" />
+		<Button variant="primary" onPress={handlePickImage} disabled={disabled}>
+			<Button.TextButton
+				title="Abrir Galeria"
+				className={`${disabled ? "text-gray-900" : "text-white"}`}
+			/>
 		</Button>
 	)
 }

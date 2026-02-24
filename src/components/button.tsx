@@ -13,14 +13,21 @@ type TextButtonProps = TextProps & {
 	title: string
 }
 
-function Button({ children, variant = "secundary", className, ...rest }: ButtonProps) {
+function Button({
+	children,
+	variant = "secundary",
+	className,
+	disabled,
+	...rest
+}: ButtonProps & { disabled?: boolean }) {
 	return (
 		<TouchableOpacity
 			className={clsx(
 				"w-full items-center justify-center p-4 rounded-md",
 				{ "bg-blue-500": variant === "primary" },
 				{ "bg-green-500": variant === "secundary" },
-				className
+				{ "opacity-60 bg-gray-400": disabled },
+				className,
 			)}
 			{...rest}
 		>
@@ -29,9 +36,12 @@ function Button({ children, variant = "secundary", className, ...rest }: ButtonP
 	)
 }
 
-function TextButton({ title, ...rest }: TextButtonProps) {
+function TextButton({ title, className, ...rest }: TextButtonProps) {
 	return (
-		<Text className="font-regular font-bold text-2xl text-white" {...rest}>
+		<Text
+			className={clsx("font-regular font-bold text-2xl", "text-white", className)}
+			{...rest}
+		>
 			{title}
 		</Text>
 	)

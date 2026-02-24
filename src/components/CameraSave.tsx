@@ -4,9 +4,10 @@ import { Button } from "./button"
 
 type CameraSaveProps = {
 	onChange?: (imagens: ImageDTO) => void // callback opcional para atualizar o banco ou o form
+	disabled?: boolean // desabilita o botão
 }
 
-export function CameraSave({ onChange }: CameraSaveProps) {
+export function CameraSave({ onChange, disabled }: CameraSaveProps) {
 	// Função principal de captura e salvamento
 	async function handleTakePhoto() {
 		try {
@@ -35,8 +36,11 @@ export function CameraSave({ onChange }: CameraSaveProps) {
 	}
 
 	return (
-		<Button variant="primary" onPress={handleTakePhoto}>
-			<Button.TextButton title="Tirar Foto" />
+		<Button variant="primary" onPress={handleTakePhoto} disabled={disabled}>
+			<Button.TextButton
+				title="Tirar Foto"
+				className={`${disabled ? "text-gray-900" : "text-white"}`}
+			/>
 		</Button>
 	)
 }
