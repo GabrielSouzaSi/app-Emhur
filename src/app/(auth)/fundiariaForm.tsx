@@ -1,10 +1,15 @@
+import * as Haptics from "expo-haptics"
 import * as Location from "expo-location"
-import { useRouter } from "expo-router"
-import { useEffect, useRef, useState } from "react"
+import { useLocalSearchParams, useRouter } from "expo-router"
+import * as Sharing from "expo-sharing"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Controller, useForm } from "react-hook-form"
 import {
 	Alert,
 	FlatList,
 	Image,
+	InteractionManager,
+	Keyboard,
 	KeyboardAvoidingView,
 	Platform,
 	Pressable,
@@ -12,8 +17,7 @@ import {
 	Text,
 	View,
 } from "react-native"
-
-import { Controller, useForm } from "react-hook-form"
+import { captureRef } from "react-native-view-shot"
 
 import { Button } from "@/components/button"
 import { DropdownButton } from "@/components/buttonDropdown"
@@ -23,11 +27,20 @@ import { HeaderBack } from "@/components/headerBack"
 import { Field } from "@/components/input"
 import { Loading } from "@/components/loading"
 import { Modal } from "@/components/modal"
-import { delDatabaseFundiaryInspection } from "@/database/fundiaryInspections"
+import { getDatabaseFundiaryEnvironmentalInfluenceType } from "@/database/fundiaryEnvironmentalInfluenceType"
+import {
+	addDatabaseFundiaryInspection,
+	delDatabaseFundiaryInspection,
+	getDatabaseFundiaryInspectionById,
+	updateDatabaseFundiaryInspection,
+} from "@/database/fundiaryInspections"
 import { getDatabaseFundiaryOccupationType } from "@/database/fundiaryOccupationType"
 import { getDatabaseFundiaryUseType } from "@/database/fundiaryUseType"
+import { FundiaryInspectionDTO } from "@/dtos/FundiaryInspectionDTO"
 import { ImageDTO } from "@/dtos/imageDTO"
 import { server } from "@/server/api"
+import { maskPhone } from "@/utils/maskPhone"
+import { maskProcess } from "@/utils/maskProcess"
 import Toast from "react-native-toast-message"
 
 enum MODAL {
@@ -37,14 +50,6 @@ enum MODAL {
 	NUMBER_PORT_PHOTO = 3,
 	PERSPECTIVE_PHOTO = 4,
 	COMPLEMENTS_PHOTO = 5,
-}
-type FormData = {
-	numero: string
-	permitType: string
-	driverType: string
-	abordagem: number
-	local: string
-	infracoes: number[]
 }
 
 type FundiaryInspectionForm = {
@@ -61,16 +66,35 @@ type FundiaryInspectionForm = {
 	occupation_type_id: string
 	use_type_id: string
 	environmental_influence_type_id: string
+	confrontation_right: string
+	confrontation_left: string
+	confrontation_back: string
+	zone: string
+	latitude: string
+	longitude: string
+	observations: string
 }
 
-export default function Autuacaoes() {
-	const ref = useRef<any>(null)
-
-	// informação do usuário
-
+export default function FundiaryInspectionForm() {
 	const [isLoaded, setIsLoaded] = useState(false)
-
 	const router = useRouter()
+
+	const scrollRef = useRef<ScrollView>(null)
+	const containerRef = useRef<View>(null)
+	const [contentH, setContentH] = useState(0)
+
+	// ✅ rota pode vir string | string[]
+	const params = useLocalSearchParams()
+	const inspectionId = useMemo(() => {
+		const raw = params.id
+		const value = Array.isArray(raw) ? raw[0] : raw
+		const n = Number(value)
+		return Number.isFinite(n) ? n : null
+	}, [params.id])
+
+	const [selectedInspection, setSelectedInspection] = useState<FundiaryInspectionDTO | null>(null)
+
+	const isEdit = !!inspectionId && !!selectedInspection
 
 	const [fundiaryOccupationType, setFundiaryOccupationType] = useState<
 		{ label: string; value: string }[]
@@ -80,8 +104,11 @@ export default function Autuacaoes() {
 		{ label: string; value: string }[]
 	>([])
 
+	const upper = (v?: string | null) => v?.trim().toLocaleUpperCase("pt-BR") ?? ""
+	//const digits = (v?: string | null) => (v ?? "").replace(/\D/g, "")
+
 	// Coordenadas GPS
-	const [gps, setGps] = useState<Location.LocationObject | null>(null)
+	//const [gps, setGps] = useState<Location.LocationObject | null>(null)
 
 	// Imagens
 	const [frontLotPhoto, setFrontLotPhoto] = useState<ImageDTO[]>([])
@@ -90,15 +117,16 @@ export default function Autuacaoes() {
 	const [perspectivePhoto, setPerspectivePhoto] = useState<ImageDTO[]>([])
 	const [complementsPhoto, setComplementsPhoto] = useState<ImageDTO[]>([])
 
-	// Observações
-	const [obs, setObs] = useState("")
-
 	// Modal
 	const [modal, setModal] = useState(MODAL.NONE)
 
 	const {
 		control,
 		handleSubmit,
+		reset,
+		setValue,
+		watch,
+		setFocus,
 		formState: { errors },
 	} = useForm<FundiaryInspectionForm>({
 		defaultValues: {
@@ -115,180 +143,348 @@ export default function Autuacaoes() {
 			occupation_type_id: "",
 			use_type_id: "",
 			environmental_influence_type_id: "",
+			confrontation_right: "",
+			confrontation_left: "",
+			confrontation_back: "",
+			zone: "",
+			latitude: "",
+			longitude: "",
+			observations: "",
 		},
 	})
 
-	// Recebe os dados das imagens e salva no estado
-	const saveImage = async (img: ImageDTO, modalType: MODAL) => {
+	const latitude = watch("latitude")
+	const longitude = watch("longitude")
+
+	// ✅ Recebe os dados das imagens e salva no estado
+	const saveImage = async (img: ImageDTO | ImageDTO[], modalType: MODAL) => {
+		const images = Array.isArray(img) ? img : [img]
+
 		switch (modalType) {
 			case MODAL.FRONT_LOT_PHOTO:
-				setFrontLotPhoto((prev) => [...prev, img])
+				setFrontLotPhoto((prev) => [...prev, ...images])
 				break
 			case MODAL.EDIFICATION_PHOTO:
-				setEdificationPhoto((prev) => [...prev, img])
+				setEdificationPhoto((prev) => [...prev, ...images])
 				break
 			case MODAL.NUMBER_PORT_PHOTO:
-				setNumberPortPhoto((prev) => [...prev, img])
+				setNumberPortPhoto((prev) => [...prev, ...images])
 				break
 			case MODAL.PERSPECTIVE_PHOTO:
-				setPerspectivePhoto((prev) => [...prev, img])
+				setPerspectivePhoto((prev) => [...prev, ...images])
 				break
 			case MODAL.COMPLEMENTS_PHOTO:
-				setComplementsPhoto((prev) => [...prev, img])
+				setComplementsPhoto((prev) => [...prev, ...images])
 				break
 		}
 	}
 
-	// Função para trazer os dados da tabela tipo de ocupação fundiária
+	// ✅ Busca por ID (offline)
+	async function getInspectionsFundiaryById() {
+		try {
+			if (!inspectionId) return
+			const response = await getDatabaseFundiaryInspectionById(inspectionId)
+			setSelectedInspection(response)
+		} catch (error) {
+			Alert.alert("Atenção!", "Erro ao buscar as fiscalizações fundiárias no banco!")
+		}
+	}
+
+	// ✅ Quando carregar selectedInspection, preencher o form + estados
+	useEffect(() => {
+		if (!selectedInspection) return
+
+		reset({
+			service_order_number: selectedInspection.serviceOrderNumber ?? "",
+			process_number: selectedInspection.processNumber ?? "",
+			process_year: selectedInspection.processYear ?? "",
+			requester_name: selectedInspection.requesterName ?? "",
+			requester_contact: selectedInspection.requesterContact ?? "",
+			address: selectedInspection.address ?? "",
+			address_number: selectedInspection.addressNumber ?? "",
+			lot_number: selectedInspection.lotNumber ?? "",
+			block_number: selectedInspection.blockNumber ?? "",
+			area_registration_owner: selectedInspection.areaRegistrationOwner ?? "",
+
+			occupation_type_id: selectedInspection.occupationTypeId
+				? String(selectedInspection.occupationTypeId)
+				: "",
+			use_type_id: selectedInspection.useTypeId ? String(selectedInspection.useTypeId) : "",
+			environmental_influence_type_id: selectedInspection.environmentalInfluenceTypeId
+				? String(selectedInspection.environmentalInfluenceTypeId)
+				: "",
+
+			confrontation_right: selectedInspection.confrontationRight ?? "",
+			confrontation_left: selectedInspection.confrontationLeft ?? "",
+			confrontation_back: selectedInspection.confrontationBack ?? "",
+			zone: selectedInspection.zone ?? "",
+			latitude: selectedInspection.latitude ?? "",
+			longitude: selectedInspection.longitude ?? "",
+			observations: selectedInspection.observations ?? "",
+		})
+
+		// ⚠️ aqui assumo que no SQLite você salvou arrays de ImageDTO
+		setFrontLotPhoto((selectedInspection.frontPhotos ?? []) as ImageDTO[])
+		setEdificationPhoto((selectedInspection.edificationPhotos ?? []) as ImageDTO[])
+		setNumberPortPhoto((selectedInspection.portPhotos ?? []) as ImageDTO[])
+		setPerspectivePhoto((selectedInspection.perspectivePhotos ?? []) as ImageDTO[])
+		setComplementsPhoto((selectedInspection.extraPhotos ?? []) as ImageDTO[])
+	}, [selectedInspection, reset])
+
+	// ✅ tipos (dropdown)
 	async function getTableFundiaryOccupationType() {
 		try {
 			const data = await getDatabaseFundiaryOccupationType()
-			let result = data.map((data: any) => {
-				return {
-					label: data.name,
-					value: data.id,
-				}
-			})
+			const result = data.map((d: any) => ({
+				label: d.name,
+				value: String(d.id),
+			}))
 			setFundiaryOccupationType(result)
 		} catch (error) {
 			console.log(error)
 		}
 	}
 
-	// Função para trazer os dados da tabela tipo de uso fundiário
 	async function getTableFundiaryUseType() {
 		try {
 			const data = await getDatabaseFundiaryUseType()
-			let result = data.map((data: any) => {
-				return {
-					label: data.name,
-					value: data.id,
-				}
-			})
+			const result = data.map((d: any) => ({
+				label: d.name,
+				value: String(d.id),
+			}))
 			setFundiaryUseType(result)
 		} catch (error) {
 			console.log(error)
 		}
 	}
 
-	// Função para remover imagem
+	// ✅ se você tiver essa tabela, descomenta e usa
+	async function getTableFundiaryEnvironmentalInfluenceType() {
+		try {
+			const data = await getDatabaseFundiaryEnvironmentalInfluenceType()
+			const result = data.map((d: any) => ({
+				label: d.name,
+				value: String(d.id),
+			}))
+			setFundiaryEnvironmentalInfluenceType(result)
+		} catch (error) {
+			console.log(error)
+		}
+	}
+
+	// ✅ remover imagem
 	const removerImagem = (modalType: MODAL, index: number) => {
 		switch (modalType) {
 			case MODAL.FRONT_LOT_PHOTO:
 				setFrontLotPhoto((prev) => prev.filter((_, i) => i !== index))
+				if (frontLotPhoto.length <= 1) setModal(MODAL.NONE)
 				break
 			case MODAL.EDIFICATION_PHOTO:
 				setEdificationPhoto((prev) => prev.filter((_, i) => i !== index))
+				if (edificationPhoto.length <= 1) setModal(MODAL.NONE)
 				break
 			case MODAL.NUMBER_PORT_PHOTO:
 				setNumberPortPhoto((prev) => prev.filter((_, i) => i !== index))
+				if (numberPortPhoto.length <= 1) setModal(MODAL.NONE)
 				break
 			case MODAL.PERSPECTIVE_PHOTO:
 				setPerspectivePhoto((prev) => prev.filter((_, i) => i !== index))
+				if (perspectivePhoto.length <= 1) setModal(MODAL.NONE)
 				break
 			case MODAL.COMPLEMENTS_PHOTO:
 				setComplementsPhoto((prev) => prev.filter((_, i) => i !== index))
+				if (complementsPhoto.length <= 1) setModal(MODAL.NONE)
 				break
 		}
 	}
 
+	// GPS
 	async function getGPS() {
 		const status = await statusGPS()
-		setGps(status)
+
+		if (!status?.coords) return
+
+		setValue("latitude", String(status.coords.latitude), {
+			shouldDirty: true,
+			shouldValidate: true,
+		})
+
+		setValue("longitude", String(status.coords.longitude), {
+			shouldDirty: true,
+			shouldValidate: true,
+		})
 	}
 
+	function buildLocalPayload(form: FormData, data: FundiaryInspectionForm) {
+		return {
+			serviceOrderNumber: data.service_order_number,
+			processNumber: data.process_number,
+			processYear: data.process_year,
+
+			requesterName: upper(data.requester_name),
+			requesterContact: data.requester_contact,
+
+			address: upper(data.address),
+			addressNumber: data.address_number,
+			lotNumber: data.lot_number,
+			blockNumber: data.block_number,
+
+			areaRegistrationOwner: data.area_registration_owner.trim(),
+			observations: data.observations ? data.observations.trim() : "Sem observações",
+
+			occupationTypeId: Number(data.occupation_type_id),
+			useTypeId: Number(data.use_type_id),
+			environmentalInfluenceTypeId: Number(data.environmental_influence_type_id),
+
+			frontPhotos: frontLotPhoto,
+			edificationPhotos: edificationPhoto,
+			portPhotos: numberPortPhoto,
+			perspectivePhotos: perspectivePhoto,
+			extraPhotos: complementsPhoto,
+
+			latitude: data.latitude ?? "",
+			longitude: data.longitude ?? "",
+
+			date: (form.get("inspection_date") as string) ?? "",
+			time: (form.get("inspection_time") as string) ?? "",
+
+			confrontationRight: data.confrontation_right,
+			confrontationLeft: data.confrontation_left,
+			confrontationBack: data.confrontation_back,
+			zone: data.zone,
+		}
+	}
+
+	function appendPhotos(form: FormData, fieldName: string, photos: ImageDTO[]) {
+		if (!photos.length) return
+
+		photos.forEach((photo, index) => {
+			form.append(fieldName, {
+				...photo,
+				uri: photo.uri,
+			} as any)
+		})
+	}
+
+	// Enviar (online / offline)
 	async function handleSubmitForm(data: FundiaryInspectionForm) {
 		setIsLoaded(true)
 
 		const form = new FormData()
 
-		// ✅ campos do formulário (vindos do react-hook-form)
-		Object.entries(data).forEach(([key, value]) => {
+		const currentdate = new Date()
+		const date =
+			currentdate.getFullYear() +
+			"-" +
+			String(currentdate.getMonth() + 1).padStart(2, "0") +
+			"-" +
+			String(currentdate.getDate()).padStart(2, "0")
+
+		const time =
+			String(currentdate.getHours()).padStart(2, "0") +
+			":" +
+			String(currentdate.getMinutes()).padStart(2, "0") +
+			":" +
+			String(currentdate.getSeconds()).padStart(2, "0")
+
+		// ✅ normaliza antes de enviar
+		const normalized: FundiaryInspectionForm = {
+			...data,
+			requester_name: upper(data.requester_name),
+			address: upper(data.address),
+
+			// se você quiser salvar só números no backend:
+			requester_contact: data.requester_contact,
+
+			// trim simples nos demais
+			service_order_number: data.service_order_number?.trim() ?? "",
+			process_number: data.process_number?.trim() ?? "",
+			process_year: data.process_number?.split("/")[1]?.trim() ?? "",
+			address_number: data.address_number?.trim() ?? "",
+			lot_number: data.lot_number?.trim() ?? "",
+			block_number: data.block_number?.trim() ?? "",
+			confrontation_right: data.confrontation_right?.trim() ?? "",
+			confrontation_left: data.confrontation_left?.trim() ?? "",
+			confrontation_back: data.confrontation_back?.trim() ?? "",
+			area_registration_owner: data.area_registration_owner?.trim() ?? "",
+			latitude: data.latitude ?? "",
+			longitude: data.longitude ?? "",
+
+			zone: data.zone,
+			occupation_type_id: data.occupation_type_id ?? "",
+			use_type_id: data.use_type_id ?? "",
+			environmental_influence_type_id: data.environmental_influence_type_id ?? "",
+			observations: data.observations?.trim() || "Sem observações",
+		}
+
+		// ✅ campos do formulário (agora normalizados)
+		Object.entries(normalized).forEach(([key, value]) => {
 			form.append(key, value ?? "")
 		})
 
-		// ✅ observações
-		form.append("observations", obs ? obs.trim() : "Sem observações")
-
 		// ✅ imagens
-		frontLotPhoto.forEach((photo) => form.append("front_photos[]", photo as any))
-		edificationPhoto.forEach((photo) => form.append("edification_photos[]", photo as any))
-		numberPortPhoto.forEach((photo) => form.append("port_photos[]", photo as any))
-		perspectivePhoto.forEach((photo) => form.append("perspective_photos[]", photo as any))
-		complementsPhoto.forEach((photo) => form.append("extra_photos[]", photo as any))
+		appendPhotos(form, "front_photos[]", frontLotPhoto)
+		appendPhotos(form, "port_photos[]", numberPortPhoto)
+		appendPhotos(form, "edification_photos[]", edificationPhoto)
+		appendPhotos(form, "perspective_photos[]", perspectivePhoto)
+		appendPhotos(form, "extra_photos[]", complementsPhoto)
 
-		// ✅ gps
-		form.append("latitude", gps?.coords?.latitude?.toString() ?? "")
-		form.append("longitude", gps?.coords?.longitude?.toString() ?? "")
-
-		// ⚠️ corrigir nomes (você tem "inspection_tim" e campos vazios)
+		// ✅ datas
 		form.append("auto_number", "")
-		form.append("inspection_date", "")
-		form.append("inspection_time", "") // ✅ (corrigido)
+		form.append("inspection_date", date)
+		form.append("inspection_time", time)
+
+		//console.log("Checklist salvo", JSON.stringify(form, null, 2))
 
 		try {
-			await server.postForm("/fundiary-inspections", form) // ✅ faltava await
+			const response = await server.postForm("/fundiary-inspections", form)
+
+			//console.log("SUCESSO FUNDIÁRIA:", response.data)
+			// ✅ mantém o SQLite sincronizado com o que foi enviado
+			if (inspectionId) {
+				await delDatabaseFundiaryInspection(inspectionId)
+			}
+
 			Toast.show({ type: "success", text1: "Formulário enviado com sucesso!" })
 			router.back()
 		} catch (error: any) {
-			console.log("⚠️ Falha no envio, salvando offline:", error?.message)
-			handleSubmitFormOffline(data)
+			//console.log("⚠️ Falha no envio, salvando offline:", error?.message)
+			// console.log("ERRO ENVIO FUNDIÁRIA -> message:", error?.message)
+			// console.log("ERRO ENVIO FUNDIÁRIA -> status:", error?.response?.status)
+			// console.log("ERRO ENVIO FUNDIÁRIA -> data:", error?.response?.data)
+			// console.log("ERRO ENVIO FUNDIÁRIA -> request:", error?.request)
+			await handleSubmitFormOffline(form, data)
 		} finally {
 			setIsLoaded(false)
 		}
 	}
 
-	async function handleSubmitFormOffline(data: FundiaryInspectionForm) {
+	async function handleSubmitFormOffline(form: FormData, data: FundiaryInspectionForm) {
 		try {
-			const save = [
-				{
-					serviceOrderNumber: data.service_order_number,
-					processNumber: data.process_number,
-					processYear: data.process_year,
+			const payload = buildLocalPayload(form, data)
 
-					requesterName: data.requester_name,
-					requesterContact: data.requester_contact,
+			if (inspectionId) {
+				const ok = await updateDatabaseFundiaryInspection(inspectionId, payload)
+				if (!ok) throw new Error("Falha ao atualizar no banco local")
+				Toast.show({ type: "success", text1: "Dados atualizados offline!" })
+				router.back()
+				return
+			}
 
-					address: data.address,
-					addressNumber: data.address_number,
-					lotNumber: data.lot_number,
-					blockNumber: data.block_number,
-
-					areaRegistrationOwner: data.area_registration_owner,
-					observations: obs ? obs.trim() : "Sem observações",
-
-					occupationTypeId: data.occupation_type_id,
-					useTypeId: data.use_type_id,
-					environmentalInfluenceTypeId: data.environmental_influence_type_id,
-
-					frontPhotos: frontLotPhoto,
-					edificationPhotos: edificationPhoto,
-					portPhotos: numberPortPhoto,
-					perspectivePhotos: perspectivePhoto,
-					extraPhotos: complementsPhoto,
-
-					latitude: gps?.coords?.latitude?.toString() ?? "",
-					longitude: gps?.coords?.longitude?.toString() ?? "",
-				},
-			]
-
-			await delDatabaseFundiaryInspection(save)
-			Toast.show({
-				type: "success",
-				text1: "Dados salvos offline!",
-			})
+			await addDatabaseFundiaryInspection([payload])
+			Toast.show({ type: "success", text1: "Dados salvos offline!" })
 			router.back()
 		} catch (error) {
 			Toast.show({
-				type: "success",
+				type: "error",
 				text1: "Algo deu errado!",
 				text2: "Não foi possível salvar!",
 			})
-			console.log(error)
+			//console.log(error)
 		}
 	}
 
-	// Solicitar permissão
+	// Permissões GPS
 	async function getPermissionGPS() {
 		const { status } = await Location.requestForegroundPermissionsAsync()
 
@@ -301,7 +497,7 @@ export default function Autuacaoes() {
 			await statusGPS()
 		}
 	}
-	// Verificar se o GPS está ativado
+
 	async function statusGPS(): Promise<Location.LocationObject | null> {
 		const isGPSEnabled = await Location.hasServicesEnabledAsync()
 
@@ -315,10 +511,29 @@ export default function Autuacaoes() {
 		})
 	}
 
+	const handlePrintAndShare = useCallback(async () => {
+		Keyboard.dismiss()
+
+		await new Promise<void>((resolve) =>
+			InteractionManager.runAfterInteractions(() => resolve()),
+		)
+		await new Promise((r) => setTimeout(r, 350))
+
+		const uri = await captureRef(containerRef, {
+			format: "png",
+			quality: 1,
+			result: "tmpfile",
+		})
+
+		await Sharing.shareAsync(uri)
+	}, [])
+
 	useEffect(() => {
 		getPermissionGPS()
 		getTableFundiaryOccupationType()
 		getTableFundiaryUseType()
+		getTableFundiaryEnvironmentalInfluenceType()
+		getInspectionsFundiaryById()
 	}, [])
 
 	return (
@@ -328,40 +543,60 @@ export default function Autuacaoes() {
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
 			>
 				<ScrollView
-					showsHorizontalScrollIndicator={false}
+					ref={scrollRef}
+					onContentSizeChange={(_, h) => setContentH(h)}
+					showsVerticalScrollIndicator={false}
 					contentContainerStyle={{ flexGrow: 1 }}
 					keyboardShouldPersistTaps="handled"
 				>
-					<View>
-						{/* Cabeçalho */}
+					<View
+						ref={containerRef}
+						collapsable={false}
+						style={{ minHeight: contentH, backgroundColor: "#fff" }}
+					>
 						<HeaderBack title="Formulário Fundiário" variant="primary" />
 
 						<View className="flex p-4">
-							{/* Nº da Ordem de Serviço e Nº do Processo */}
 							<View className="flex-row justify-between gap-4 mb-4">
+								{/* Número da ordem de serviço */}
 								<View className="flex-1">
 									<Text className="text-gray-500 font-regular text-2xl font-bold">
-										Ordem de Serviço:
+										Nº de Serviço:
 									</Text>
+
 									<Controller
 										control={control}
 										name="service_order_number"
-										rules={{ required: "Campo obrigatório!" }}
-										render={({ field: { onChange, value } }) => (
+										rules={{
+											required: "Campo obrigatório!",
+											pattern: {
+												value: /^\d+\/\d{4}$/,
+												message: "Inválido. ex: 123/2026",
+											},
+										}}
+										render={({
+											field: { onChange, value, ref },
+											fieldState: { error },
+										}) => (
 											<Field
-												placeholder="Ordem de Serviço"
+												ref={ref}
+												placeholder="Nº de Serviço"
 												variant="primary"
-												onChangeText={onChange}
 												value={value}
+												returnKeyType="next"
+												keyboardType="numeric"
+												submitBehavior="submit"
+												onSubmitEditing={() => setFocus("process_number")}
+												onChangeText={(text) => {
+													onChange(maskProcess(text))
+												}}
+												errorMessage={error?.message}
 											/>
 										)}
 									/>
-									{errors.service_order_number?.message ? (
-										<Text className="text-red-500">
-											{errors.service_order_number.message}
-										</Text>
-									) : null}
 								</View>
+
+								{/* Número do processo */}
 								<View className="flex-1">
 									<Text className="text-gray-500 font-regular text-2xl font-bold">
 										Nº do Processo:
@@ -369,47 +604,34 @@ export default function Autuacaoes() {
 									<Controller
 										control={control}
 										name="process_number"
-										rules={{ required: "Informe o nº do processo" }}
-										render={({ field: { onChange, value } }) => (
+										rules={{
+											required: "Campo obrigatório!",
+											pattern: {
+												value: /^\d+\/\d{4}$/,
+												message: "Inválido. ex: 123/2026",
+											},
+										}}
+										render={({
+											field: { onChange, value, ref },
+											fieldState: { error },
+										}) => (
 											<Field
-												placeholder="Número do Processo"
+												ref={ref}
+												placeholder="Nº do Processo"
 												variant="primary"
-												onChangeText={onChange}
+												returnKeyType="next"
+												keyboardType="numeric"
+												submitBehavior="submit"
+												onSubmitEditing={() => setFocus("requester_name")}
+												onChangeText={(text) => {
+													onChange(maskProcess(text))
+												}}
 												value={value}
+												errorMessage={error?.message}
 											/>
 										)}
 									/>
-									{errors.process_number?.message ? (
-										<Text className="text-red-500">
-											{errors.process_number.message}
-										</Text>
-									) : null}
 								</View>
-							</View>
-
-							{/* Ano do Processo */}
-							<View className="flex mb-4">
-								<Text className="text-gray-500 font-regular text-2xl font-bold">
-									Ano do Processo:
-								</Text>
-								<Controller
-									control={control}
-									name="process_year"
-									rules={{ required: "Informe o ano do processo" }}
-									render={({ field: { onChange, value } }) => (
-										<Field
-											placeholder="Ano do Processo"
-											variant="primary"
-											onChangeText={onChange}
-											value={value}
-										/>
-									)}
-								/>
-								{errors.process_year?.message ? (
-									<Text className="text-red-500">
-										{errors.process_year.message}
-									</Text>
-								) : null}
 							</View>
 
 							{/* Requerente */}
@@ -421,20 +643,23 @@ export default function Autuacaoes() {
 									control={control}
 									name="requester_name"
 									rules={{ required: "Informe o nome do requerente" }}
-									render={({ field: { onChange, value } }) => (
+									render={({
+										field: { onChange, value, ref },
+										fieldState: { error },
+									}) => (
 										<Field
+											ref={ref}
 											placeholder="Nome do Requerente"
 											variant="primary"
+											returnKeyType="next"
+											submitBehavior="submit"
+											onSubmitEditing={() => setFocus("requester_contact")}
 											onChangeText={onChange}
 											value={value}
+											errorMessage={error?.message}
 										/>
 									)}
 								/>
-								{errors.requester_name?.message ? (
-									<Text className="text-red-500">
-										{errors.requester_name.message}
-									</Text>
-								) : null}
 							</View>
 
 							{/* Contato do Requerente */}
@@ -447,24 +672,31 @@ export default function Autuacaoes() {
 									name="requester_contact"
 									rules={{
 										validate: (v) => {
-											if (!v || !v.trim()) return true // vazio = OK
-											return v.trim().length >= 8 || "Contato muito curto"
+											if (!v || !v.trim()) return true
+											return v.trim().length >= 14 || "Contato muito curto!"
 										},
+										required: "Informe o contato!",
 									}}
-									render={({ field: { onChange, value } }) => (
+									render={({
+										field: { onChange, value, ref },
+										fieldState: { error },
+									}) => (
 										<Field
+											ref={ref}
 											placeholder="Contato do Requerente"
 											variant="primary"
-											onChangeText={onChange}
+											returnKeyType="next"
+											submitBehavior="submit"
+											onSubmitEditing={() => setFocus("address")}
+											keyboardType="phone-pad"
+											onChangeText={(text) => {
+												onChange(maskPhone(text))
+											}}
 											value={value}
+											errorMessage={error?.message}
 										/>
 									)}
 								/>
-								{errors.requester_contact?.message ? (
-									<Text className="text-red-500">
-										{errors.requester_contact.message}
-									</Text>
-								) : null}
 							</View>
 
 							{/* Endereço */}
@@ -476,21 +708,26 @@ export default function Autuacaoes() {
 									control={control}
 									name="address"
 									rules={{ required: "Informe o endereço" }}
-									render={({ field: { onChange, value } }) => (
+									render={({
+										field: { onChange, value, ref },
+										fieldState: { error },
+									}) => (
 										<Field
+											ref={ref}
 											placeholder="Endereço completo"
 											variant="primary"
+											returnKeyType="next"
+											submitBehavior="submit"
+											onSubmitEditing={() => setFocus("address_number")}
 											onChangeText={onChange}
 											value={value}
+											errorMessage={error?.message}
 										/>
 									)}
 								/>
-								{errors.address?.message ? (
-									<Text className="text-red-500">{errors.address.message}</Text>
-								) : null}
 							</View>
 
-							{/* Número do Endereço */}
+							{/* Número do Imóvel */}
 							<View className="flex mb-4">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
 									Nº de Porta:
@@ -498,90 +735,236 @@ export default function Autuacaoes() {
 								<Controller
 									control={control}
 									name="address_number"
-									rules={{ required: "Informe o número" }}
-									render={({ field: { onChange, value } }) => (
+									render={({ field: { onChange, value, ref } }) => (
 										<Field
+											ref={ref}
 											placeholder="Número do Endereço"
 											variant="primary"
+											keyboardType="numeric"
+											submitBehavior="submit"
+											returnKeyType="next"
+											onSubmitEditing={() => setFocus("lot_number")}
 											onChangeText={onChange}
 											value={value}
 										/>
 									)}
 								/>
-								{errors.address_number?.message ? (
-									<Text className="text-red-500">
-										{errors.address_number.message}
-									</Text>
-								) : null}
 							</View>
 
-							{/* Lote e Quadra */}
+							{/* Lote, Quadra e Zona */}
 							<View className="flex mb-4">
 								<View className="flex-row justify-between gap-4">
 									<View className="flex-1">
 										<Text className="text-gray-500 font-regular text-2xl font-bold">
-											Nº do Lote:
+											Lote:
 										</Text>
 										<Controller
 											control={control}
 											name="lot_number"
-											rules={{ required: "Informe o número do lote" }}
-											render={({ field: { onChange, value } }) => (
+											rules={{ required: "Obrigatório!" }}
+											render={({
+												field: { onChange, value, ref },
+												fieldState: { error },
+											}) => (
 												<Field
-													placeholder="Número do Lote"
+													ref={ref}
+													placeholder="Nº Lote"
 													variant="primary"
+													keyboardType="numeric"
+													submitBehavior="submit"
+													returnKeyType="next"
+													onSubmitEditing={() => setFocus("block_number")}
 													onChangeText={onChange}
 													value={value}
+													errorMessage={error?.message}
 												/>
 											)}
 										/>
-										{errors.lot_number?.message ? (
-											<Text className="text-red-500">
-												{errors.lot_number.message}
-											</Text>
-										) : null}
 									</View>
 
 									<View className="flex-1">
 										<Text className="text-gray-500 font-regular text-2xl font-bold">
-											Nº do Quadra:
+											Quadra:
 										</Text>
 										<Controller
 											control={control}
 											name="block_number"
-											rules={{ required: "Informe o número da quadra" }}
-											render={({ field: { onChange, value } }) => (
+											rules={{ required: "Obrigatório!" }}
+											render={({
+												field: { onChange, value, ref },
+												fieldState: { error },
+											}) => (
 												<Field
-													placeholder="Número da Quadra"
+													ref={ref}
+													placeholder="Nº"
 													variant="primary"
+													keyboardType="numeric"
+													submitBehavior="submit"
+													returnKeyType="next"
+													onSubmitEditing={() => setFocus("zone")}
+													onChangeText={onChange}
+													value={value}
+													errorMessage={error?.message}
+												/>
+											)}
+										/>
+									</View>
+
+									<View className="flex-1">
+										<Text className="text-gray-500 font-regular text-2xl font-bold">
+											Zona:
+										</Text>
+										<Controller
+											control={control}
+											name="zone"
+											rules={{ required: "Obrigatório!" }}
+											render={({
+												field: { onChange, value, ref },
+												fieldState: { error },
+											}) => (
+												<Field
+													ref={ref}
+													placeholder="Zona"
+													variant="primary"
+													keyboardType="numeric"
+													submitBehavior="submit"
+													returnKeyType="next"
+													onSubmitEditing={() =>
+														setFocus("confrontation_right")
+													}
+													onChangeText={onChange}
+													value={value}
+													errorMessage={error?.message}
+												/>
+											)}
+										/>
+									</View>
+								</View>
+							</View>
+
+							{/* Confrontações: direito, esquerdo e fundos */}
+							<View className="flex mb-4">
+								<View className="mb-4 items-center justify-center">
+									<Text className="text-gray-500 font-regular text-2xl font-bold">
+										Confrontações!
+									</Text>
+								</View>
+								<View className="flex-row justify-between gap-4">
+									<View className="flex-1">
+										<Text className="text-gray-500 font-regular text-2xl font-bold">
+											Direito:
+										</Text>
+										<Controller
+											control={control}
+											name="confrontation_right"
+											render={({ field: { onChange, value, ref } }) => (
+												<Field
+													ref={ref}
+													placeholder="Direito"
+													variant="primary"
+													keyboardType="numeric"
+													submitBehavior="submit"
+													returnKeyType="next"
+													onSubmitEditing={() =>
+														setFocus("confrontation_left")
+													}
 													onChangeText={onChange}
 													value={value}
 												/>
 											)}
 										/>
-										{errors.block_number?.message ? (
-											<Text className="text-red-500">
-												{errors.block_number.message}
-											</Text>
-										) : null}
+									</View>
+
+									<View className="flex-1">
+										<Text className="text-gray-500 font-regular text-2xl font-bold">
+											Esq.:
+										</Text>
+										<Controller
+											control={control}
+											name="confrontation_left"
+											render={({ field: { onChange, value, ref } }) => (
+												<Field
+													ref={ref}
+													placeholder="Esquerdo"
+													variant="primary"
+													keyboardType="numeric"
+													submitBehavior="submit"
+													returnKeyType="next"
+													onSubmitEditing={() =>
+														setFocus("confrontation_back")
+													}
+													onChangeText={onChange}
+													value={value}
+												/>
+											)}
+										/>
+									</View>
+
+									<View className="flex-1">
+										<Text className="text-gray-500 font-regular text-2xl font-bold">
+											Fundos:
+										</Text>
+										<Controller
+											control={control}
+											name="confrontation_back"
+											render={({ field: { onChange, value, ref } }) => (
+												<Field
+													ref={ref}
+													placeholder="Fundo"
+													variant="primary"
+													keyboardType="numeric"
+													submitBehavior="submit"
+													returnKeyType="next"
+													onSubmitEditing={() =>
+														setFocus("area_registration_owner")
+													}
+													onChangeText={onChange}
+													value={value}
+												/>
+											)}
+										/>
 									</View>
 								</View>
 							</View>
 
-							<Button className="mb-4" variant="primary" onPress={getGPS}>
-								<Button.TextButton title="Marcar Posição" />
-							</Button>
+							<Controller
+								control={control}
+								name="latitude"
+								rules={{ required: "Marque a posição GPS" }}
+								render={() => null}
+							/>
 
-							{gps && (
-								<View className="flex mb-4">
+							<Controller
+								control={control}
+								name="longitude"
+								rules={{ required: "Marque a posição GPS" }}
+								render={() => null}
+							/>
+
+							<Pressable
+								className="mb-4 w-full items-center justify-center p-4 rounded-md bg-blue-500 active:opacity-60"
+								onLongPress={() => {
+									getGPS()
+									Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
+								}}
+							>
+								<Button.TextButton
+									title={latitude ? "Atualizar Posição" : "Marcar Posição"}
+								/>
+							</Pressable>
+
+							{errors.latitude && (
+								<Text className="text-red-500 mb-4">{errors.latitude.message}</Text>
+							)}
+
+							{latitude && longitude && (
+								<View className="flex items-center mb-4">
 									<Text className="text-gray-500 font-regular text-2xl font-bold">
-										Posição GPS: {gps?.coords?.latitude},{" "}
-										{gps?.coords?.longitude}
+										GPS: {latitude}, {longitude}
 									</Text>
 								</View>
 							)}
 
-							{/* Matrícula da Área/Proprietário */}
 							<View className="flex mb-4">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
 									Matricula da Área/Proprietário:
@@ -589,24 +972,22 @@ export default function Autuacaoes() {
 								<Controller
 									control={control}
 									name="area_registration_owner"
-									// rules={{ required: "Informe a matrícula da área/proprietário" }}
-									render={({ field: { onChange, value } }) => (
+									render={({ field: { onChange, value, ref } }) => (
 										<Field
+											ref={ref}
 											placeholder="Matrícula da Área/Proprietário"
 											variant="primary"
+											submitBehavior="submit"
+											returnKeyType="next"
+											onSubmitEditing={() => setFocus("occupation_type_id")}
 											onChangeText={onChange}
 											value={value}
 										/>
 									)}
 								/>
-								{errors.area_registration_owner?.message ? (
-									<Text className="text-red-500">
-										{errors.area_registration_owner.message}
-									</Text>
-								) : null}
 							</View>
 
-							{/* Tipo de Ocupação */}
+							{/* Tipo de ocupação */}
 							<View className="mb-4">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
 									Tipo de Ocupação:
@@ -615,19 +996,25 @@ export default function Autuacaoes() {
 									control={control}
 									name="occupation_type_id"
 									rules={{ required: "Selecione o tipo de ocupação!" }}
-									render={({ field: { onChange, value } }) => (
+									render={({
+										field: { onChange, value, ref },
+										fieldState: { error },
+									}) => (
 										<DropdownButton
+											ref={ref}
 											data={fundiaryOccupationType}
 											placeholder="Ocupação"
 											value={value}
-											errorMessage={errors.occupation_type_id?.message}
-											onSelect={(item) => onChange(item.value)}
+											errorMessage={error?.message}
+											onSelect={(item) => {
+												;(onChange(item.value), setFocus("use_type_id"))
+											}}
 										/>
 									)}
 								/>
 							</View>
 
-							{/* Tipo de Uso */}
+							{/* Tipo de uso */}
 							<View className="mb-4">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
 									Tipo de Uso:
@@ -636,19 +1023,26 @@ export default function Autuacaoes() {
 									control={control}
 									name="use_type_id"
 									rules={{ required: "Selecione o tipo de uso!" }}
-									render={({ field: { onChange, value } }) => (
+									render={({
+										field: { onChange, value, ref },
+										fieldState: { error },
+									}) => (
 										<DropdownButton
+											ref={ref}
 											data={fundiaryUseType}
 											placeholder="Tipo de Uso"
 											value={value}
-											errorMessage={errors.use_type_id?.message}
-											onSelect={(item) => onChange(item.value)}
+											errorMessage={error?.message}
+											onSelect={(item) => {
+												;(onChange(item.value),
+													setFocus("environmental_influence_type_id"))
+											}}
 										/>
 									)}
 								/>
 							</View>
 
-							{/* Influência Ambiental */}
+							{/* Tipo de influência ambiental */}
 							<View className="mb-4">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
 									Tipo de Influência Ambiental:
@@ -656,64 +1050,74 @@ export default function Autuacaoes() {
 								<Controller
 									control={control}
 									name="environmental_influence_type_id"
-									// rules={{
-									// 	required: "Selecione o tipo de influência ambiental!",
-									// }}
-									render={({ field: { onChange, value } }) => (
+									rules={{
+										required: "Selecione o tipo de influência ambiental!",
+									}}
+									render={({
+										field: { onChange, value, ref },
+										fieldState: { error },
+									}) => (
 										<DropdownButton
+											ref={ref}
 											data={fundiaryEnvironmentalInfluenceType}
 											placeholder="Tipo de Influência Ambiental"
 											value={value}
-											errorMessage={
-												errors.environmental_influence_type_id?.message
-											}
-											onSelect={(item) => onChange(item.value)}
+											errorMessage={error?.message}
+											onSelect={(item) => {
+												onChange(item.value)
+												setFocus("observations")
+											}}
 										/>
 									)}
 								/>
 							</View>
 
-							{/* Observação */}
 							<View className="flex mb-5">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
 									Observação:
 								</Text>
-								<Field
-									placeholder="Descreva o assunto."
-									variant="primary"
-									onChangeText={setObs}
-									value={obs}
-									multiline={true}
+
+								<Controller
+									control={control}
+									name="observations"
+									render={({ field: { onChange, value, ref } }) => (
+										<Field
+											ref={ref}
+											placeholder="Descreva o assunto."
+											variant="primary"
+											submitBehavior="submit"
+											returnKeyType="none"
+											onChangeText={onChange}
+											value={value}
+											multiline
+										/>
+									)}
 								/>
 							</View>
 
 							{/* Imagens */}
 							<View className="flex">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
-									Frente do Lote(Uma foto):
+									Frente do Lote:
 								</Text>
 								<View className="flex flex-row justify-between my-4">
 									<View className="flex-1 mr-2">
-										{/* Componente da camera */}
 										<CameraSave
 											onChange={(img) =>
 												saveImage(img, MODAL.FRONT_LOT_PHOTO)
 											}
-											disabled={frontLotPhoto.length >= 1} // Desabilita se já tiver uma foto
 										/>
 									</View>
 									<View className="flex-1 ml-2">
-										{/* Abrir Galeria */}
 										<GalleryPick
+											multiple={true}
 											onChange={(img) =>
 												saveImage(img, MODAL.FRONT_LOT_PHOTO)
 											}
-											disabled={frontLotPhoto.length >= 1} // Desabilita se já tiver uma foto
 										/>
 									</View>
 								</View>
 
-								{/* Se houver imagem */}
 								{frontLotPhoto.length > 0 ? (
 									<Button
 										className="mb-4"
@@ -724,37 +1128,31 @@ export default function Autuacaoes() {
 											title={`Imagens(${frontLotPhoto.length})`}
 										/>
 									</Button>
-								) : (
-									<></>
-								)}
+								) : null}
 							</View>
 
 							<View className="flex">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
-									Foto do Nº de Porta(Uma foto):
+									Foto do Nº de Porta:
 								</Text>
 								<View className="flex flex-row justify-between my-4">
 									<View className="flex-1 mr-2">
-										{/* Componente da camera */}
 										<CameraSave
 											onChange={(img) =>
 												saveImage(img, MODAL.NUMBER_PORT_PHOTO)
 											}
-											disabled={numberPortPhoto.length >= 1} // Desabilita se já tiver uma foto
 										/>
 									</View>
 									<View className="flex-1 ml-2">
-										{/* Abrir Galeria */}
 										<GalleryPick
+											multiple={true}
 											onChange={(img) =>
 												saveImage(img, MODAL.NUMBER_PORT_PHOTO)
 											}
-											disabled={numberPortPhoto.length >= 1} // Desabilita se já tiver uma foto
 										/>
 									</View>
 								</View>
 
-								{/* Se houver imagem */}
 								{numberPortPhoto.length > 0 ? (
 									<Button
 										className="mb-4"
@@ -765,37 +1163,31 @@ export default function Autuacaoes() {
 											title={`Imagens(${numberPortPhoto.length})`}
 										/>
 									</Button>
-								) : (
-									<></>
-								)}
+								) : null}
 							</View>
 
 							<View className="flex">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
-									Edificação(Uma foto):
+									Edificação:
 								</Text>
 								<View className="flex flex-row justify-between my-4">
 									<View className="flex-1 mr-2">
-										{/* Componente da camera */}
 										<CameraSave
 											onChange={(img) =>
 												saveImage(img, MODAL.EDIFICATION_PHOTO)
 											}
-											disabled={edificationPhoto.length >= 1} // Desabilita se já tiver uma foto
 										/>
 									</View>
 									<View className="flex-1 ml-2">
-										{/* Abrir Galeria */}
 										<GalleryPick
+											multiple={true}
 											onChange={(img) =>
 												saveImage(img, MODAL.EDIFICATION_PHOTO)
 											}
-											disabled={edificationPhoto.length >= 1} // Desabilita se já tiver uma foto
 										/>
 									</View>
 								</View>
 
-								{/* Se houver imagem */}
 								{edificationPhoto.length > 0 ? (
 									<Button
 										className="mb-4"
@@ -806,37 +1198,31 @@ export default function Autuacaoes() {
 											title={`Imagens(${edificationPhoto.length})`}
 										/>
 									</Button>
-								) : (
-									<></>
-								)}
+								) : null}
 							</View>
 
 							<View className="flex">
 								<Text className="text-gray-500 font-regular text-2xl font-bold">
-									Pespectiva:
+									Perspectiva:
 								</Text>
 								<View className="flex flex-row justify-between my-4">
 									<View className="flex-1 mr-2">
-										{/* Componente da camera */}
 										<CameraSave
 											onChange={(img) =>
 												saveImage(img, MODAL.PERSPECTIVE_PHOTO)
 											}
-											//disabled={edificationPhoto.length >= 1} // Desabilita se já tiver uma foto
 										/>
 									</View>
 									<View className="flex-1 ml-2">
-										{/* Abrir Galeria */}
 										<GalleryPick
+											multiple={true}
 											onChange={(img) =>
 												saveImage(img, MODAL.PERSPECTIVE_PHOTO)
 											}
-											disabled={perspectivePhoto.length >= 1} // Desabilita se já tiver uma foto
 										/>
 									</View>
 								</View>
 
-								{/* Se houver imagem */}
 								{perspectivePhoto.length > 0 ? (
 									<Button
 										className="mb-4"
@@ -847,9 +1233,7 @@ export default function Autuacaoes() {
 											title={`Imagens(${perspectivePhoto.length})`}
 										/>
 									</Button>
-								) : (
-									<></>
-								)}
+								) : null}
 							</View>
 
 							<View className="flex mb-5">
@@ -858,7 +1242,6 @@ export default function Autuacaoes() {
 								</Text>
 								<View className="flex flex-row justify-between my-4">
 									<View className="flex-1 mr-2">
-										{/* Componente da camera */}
 										<CameraSave
 											onChange={(img) =>
 												saveImage(img, MODAL.COMPLEMENTS_PHOTO)
@@ -866,8 +1249,8 @@ export default function Autuacaoes() {
 										/>
 									</View>
 									<View className="flex-1 ml-2">
-										{/* Abrir Galeria */}
 										<GalleryPick
+											multiple={true}
 											onChange={(img) =>
 												saveImage(img, MODAL.COMPLEMENTS_PHOTO)
 											}
@@ -875,7 +1258,6 @@ export default function Autuacaoes() {
 									</View>
 								</View>
 
-								{/* Se houver imagem */}
 								{complementsPhoto.length > 0 ? (
 									<Button
 										className="mb-4"
@@ -886,12 +1268,12 @@ export default function Autuacaoes() {
 											title={`Imagens(${complementsPhoto.length})`}
 										/>
 									</Button>
-								) : (
-									<></>
-								)}
+								) : null}
 							</View>
 
-							{/* Salvar */}
+							{/* <Button variant="primary" onPress={handlePrintAndShare}>
+								<Button.TextButton title="ENVIAR" />
+							</Button> */}
 							<Button variant="primary" onPress={handleSubmit(handleSubmitForm)}>
 								<Button.TextButton title="ENVIAR" />
 							</Button>
@@ -899,21 +1281,16 @@ export default function Autuacaoes() {
 					</View>
 				</ScrollView>
 			</KeyboardAvoidingView>
-			{/* Modal de exibição das imagens */}
 
 			<Modal
 				className="bg-gray-200"
 				variant="primary"
 				visible={
-					modal === MODAL.FRONT_LOT_PHOTO
-						? true
-						: modal === MODAL.EDIFICATION_PHOTO
-							? true
-							: modal === MODAL.NUMBER_PORT_PHOTO
-								? true
-								: modal === MODAL.COMPLEMENTS_PHOTO
-									? true
-									: false
+					modal === MODAL.FRONT_LOT_PHOTO ||
+					modal === MODAL.EDIFICATION_PHOTO ||
+					modal === MODAL.NUMBER_PORT_PHOTO ||
+					modal === MODAL.PERSPECTIVE_PHOTO ||
+					modal === MODAL.COMPLEMENTS_PHOTO
 				}
 				onClose={() => setModal(MODAL.NONE)}
 			>
@@ -926,21 +1303,20 @@ export default function Autuacaoes() {
 									? edificationPhoto
 									: modal === MODAL.NUMBER_PORT_PHOTO
 										? numberPortPhoto
-										: modal === MODAL.COMPLEMENTS_PHOTO
-											? complementsPhoto
-											: []
+										: modal === MODAL.PERSPECTIVE_PHOTO
+											? perspectivePhoto
+											: modal === MODAL.COMPLEMENTS_PHOTO
+												? complementsPhoto
+												: []
 						}
 						keyExtractor={(_, index) => index.toString()}
 						renderItem={({ item, index }) => (
 							<View className="w-full mb-4 bg-white p-2 rounded-md border-gray-300 border-2">
 								<Image
-									className="h-56 rounded-md"
-									source={{
-										uri: item.uri,
-									}}
+									className="h-80 rounded-md"
+									source={{ uri: item.uri }}
 									resizeMode="contain"
 								/>
-
 								<Pressable
 									className="py-4 items-center"
 									onPress={() => removerImagem(modal, index)}
@@ -955,6 +1331,7 @@ export default function Autuacaoes() {
 					/>
 				</View>
 			</Modal>
+
 			{isLoaded && <Loading />}
 		</>
 	)

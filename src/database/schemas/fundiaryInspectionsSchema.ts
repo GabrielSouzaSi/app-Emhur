@@ -32,5 +32,13 @@ export const fundiaryInspections = sqliteTable("fundiaryInspections", {
   perspectivePhotos: text("perspective_photos", { mode: 'json' }),
 
   latitude: text("latitude"),
-  longitude: text("longitude")
+  longitude: text("longitude"),
+
+  date: text("date"),
+  time: text("time"),
+
+  confrontationRight: text("confrontation_right"),
+  confrontationLeft: text("confrontation_left"),
+  confrontationBack: text("confrontation_back"),
+  zone: text("zone")
 })

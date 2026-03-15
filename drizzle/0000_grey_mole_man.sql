@@ -8,6 +8,47 @@ CREATE TABLE `driverTypes` (
 	`name` text
 );
 --> statement-breakpoint
+CREATE TABLE `fundiaryInspections` (
+	`id` integer PRIMARY KEY NOT NULL,
+	`service_order_number` text,
+	`process_number` text,
+	`process_year` text,
+	`requester_name` text,
+	`requester_contact` text,
+	`address` text,
+	`address_number` text,
+	`lot_number` text,
+	`block_number` text,
+	`area_registration_owner` text,
+	`observations` text,
+	`occupation_type_id` integer,
+	`use_type_id` integer,
+	`environmental_influence_type_id` integer,
+	`front_photos` text,
+	`edification_photos` text,
+	`extra_photos` text,
+	`port_photos` text,
+	`perspective_photos` text,
+	`latitude` text,
+	`longitude` text,
+	`date` text,
+	`time` text,
+	`confrontation_right` text,
+	`confrontation_left` text,
+	`confrontation_back` text,
+	`zone` text
+);
+--> statement-breakpoint
+CREATE TABLE `fundiaryOccupationType` (
+	`id` integer PRIMARY KEY NOT NULL,
+	`name` text
+);
+--> statement-breakpoint
+CREATE TABLE `fundiaryUseType` (
+	`id` integer PRIMARY KEY NOT NULL,
+	`name` text
+);
+--> statement-breakpoint
 CREATE TABLE `inspectionLocations` (
 	`id` integer PRIMARY KEY NOT NULL,
 	`name` text

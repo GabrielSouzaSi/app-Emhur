@@ -1,18 +1,54 @@
+// GalleryPick.tsx
 import { ImageDTO } from "@/dtos/imageDTO"
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator"
 import * as ImagePicker from "expo-image-picker"
-import { Alert } from "react-native"
+import { Alert, Keyboard } from "react-native"
 import { Button } from "./button"
 
-type GalleryPickProps = {
-	onChange?: (image: ImageDTO) => void // callback retorna o objeto da imagem
-	disabled?: boolean // desabilita o botão
+type GalleryPickSingleProps = {
+	onChange?: (image: ImageDTO) => void
+	disabled?: boolean
+	multiple?: false
 }
 
-export function GalleryPick({ onChange, disabled }: GalleryPickProps) {
+type GalleryPickMultipleProps = {
+	onChange?: (images: ImageDTO[]) => void
+	disabled?: boolean
+	multiple: true
+}
+
+type GalleryPickProps = GalleryPickSingleProps | GalleryPickMultipleProps
+
+async function normalizeImage(
+	asset: ImagePicker.ImagePickerAsset,
+	index: number,
+): Promise<ImageDTO> {
+	const context = ImageManipulator.manipulate(asset.uri)
+
+	// opcional, mas recomendado para upload mais leve
+	context.resize({ width: 1600 })
+
+	const image = await context.renderAsync()
+
+	const saved = await image.saveAsync({
+		format: SaveFormat.JPEG,
+		compress: 0.7,
+	})
+
+	return {
+		uri: saved.uri,
+		name: `image_${Date.now()}_${index}_${Math.random().toString(36).slice(2)}.jpg`,
+		type: "image/jpeg",
+	}
+}
+
+export function GalleryPick(props: GalleryPickProps) {
 	async function handlePickImage() {
 		try {
-			// 1️⃣ Solicita permissão de acesso à galeria
+			Keyboard.dismiss()
+
 			const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+
 			if (status !== "granted") {
 				Alert.alert(
 					"Permissão necessária",
@@ -21,37 +57,35 @@ export function GalleryPick({ onChange, disabled }: GalleryPickProps) {
 				return
 			}
 
-			// 2️⃣ Abre o seletor de imagens
 			const result = await ImagePicker.launchImageLibraryAsync({
 				mediaTypes: ["images"],
-				allowsEditing: true,
-				aspect: [1, 1],
+				allowsEditing: false,
+				allowsMultipleSelection: props.multiple === true,
 				quality: 1,
 			})
 
-			if (result.canceled) return
+			if (result.canceled || !result.assets?.length) return
 
-			const asset = result.assets[0]
+			const normalizedImages = await Promise.all(
+				result.assets.map((asset, index) => normalizeImage(asset, index)),
+			)
 
-			// 3️⃣ Cria o objeto compatível com o schema
-			const imageObj: ImageDTO = {
-				uri: asset.uri,
-				name: asset.fileName ?? `${Date.now()}.jpeg`,
-				type: asset.mimeType ?? "image/jpeg",
+			if (props.multiple === true) {
+				props.onChange?.(normalizedImages)
+			} else {
+				props.onChange?.(normalizedImages[0])
 			}
-
-			// 4️⃣ Retorna o objeto da imagem
-			onChange?.(imageObj)
 		} catch (error) {
 			console.log("Erro ao selecionar imagem:", error)
+			Alert.alert("Erro", "Não foi possível selecionar a imagem.")
 		}
 	}
 
 	return (
-		<Button variant="primary" onPress={handlePickImage} disabled={disabled}>
+		<Button variant="primary" onPress={handlePickImage} disabled={props.disabled}>
 			<Button.TextButton
-				title="Abrir Galeria"
-				className={`${disabled ? "text-gray-900" : "text-white"}`}
+				title="Galeria"
+				className={props.disabled ? "text-gray-900" : "text-white"}
 			/>
 		</Button>
 	)

@@ -1,10 +1,10 @@
-import * as violationsCodeSchema from "@/database/schemas/violationsCodeSchema";
-import { tableViolationsCode } from "./connection";
+import { violationsCode } from "@/database/schemas/violationsCodeSchema";
+import { db } from "./connection";
 
 // Função para adicionar no banco os motivos da vistoria
 export async function getDatabaseViolationCode() {
     try {
-        const response = await tableViolationsCode.query.violationsCode.findMany()
+        const response = await db.select().from(violationsCode);
 
         return response
     } catch (error) {
@@ -14,8 +14,8 @@ export async function getDatabaseViolationCode() {
 // Função para deletar no banco os motivos da vistoria
 export async function delDatabaseViolationCode(data: any) {
     try {
-        tableViolationsCode.delete(violationsCodeSchema.violationsCode).run();
-        tableViolationsCode.insert(violationsCodeSchema.violationsCode).values(data).run();
+        db.delete(violationsCode).run();
+        db.insert(violationsCode).values(data).run();
     } catch (error) {
         console.log("delDatabaseViolationCode error =>" + error);
     }

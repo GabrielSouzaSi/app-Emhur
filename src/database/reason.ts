@@ -1,11 +1,11 @@
-import * as reasonsSchema from "@/database/schemas/reasonsSchema";
+import { reasons } from "@/database/schemas/reasonsSchema";
 import { eq } from "drizzle-orm";
-import { tableReason } from "./connection";
+import { db } from "./connection";
 
 // Função para buscar no banco os motivos da vistoria
 export async function getDatabaseReason() {
     try {
-        const response = await tableReason.query.reasons.findMany();
+        const response = await db.select().from(reasons);
 
         return response
     } catch (error) {
@@ -15,7 +15,7 @@ export async function getDatabaseReason() {
 // Função para buscar os items do motivo por ID
 export async function getDatabaseReasonItemId(id: number) {
     try {
-        const response = await tableReason.query.reasons.findMany({ where: eq(reasonsSchema.reasons.id, id) });
+        const response = await db.query.reasons.findMany({ where: eq(reasons.id, id) });
         // Retorna apenas os itens
         return response.map((reason) => reason.items).flat();
     } catch (error) {
@@ -25,7 +25,7 @@ export async function getDatabaseReasonItemId(id: number) {
 // Função para buscar o motivo por ID
 export async function getDatabaseReasonId(id: number) {
     try {
-        const [response] = await tableReason.query.reasons.findMany({ where: eq(reasonsSchema.reasons.id, id), limit: 1 });
+        const [response] = await db.query.reasons.findMany({ where: eq(reasons.id, id), limit: 1 });
         // Retorna apenas os itens
         if (!response) return null;
         return response ?? null;
@@ -36,8 +36,8 @@ export async function getDatabaseReasonId(id: number) {
 // Função para deletar no banco os motivos da vistoria
 export async function delDatabaseReason(data: any) {
     try {
-        tableReason.delete(reasonsSchema.reasons).run();
-        tableReason.insert(reasonsSchema.reasons).values(data).run();
+        db.delete(reasons).run();
+        db.insert(reasons).values(data).run();
     } catch (error) {
         console.log("delAddDatabaseReason error =>" + error);
     }

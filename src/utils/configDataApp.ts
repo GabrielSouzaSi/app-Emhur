@@ -3,6 +3,7 @@ import { Alert } from "react-native";
 
 import { delDatabaseApproach } from "@/database/approach";
 import { delDatabaseDriverType } from "@/database/driverTypes";
+import { delDatabaseFundiaryEnvironmentalInfluenceType } from "@/database/fundiaryEnvironmentalInfluenceType";
 import { delDatabaseFundiaryOccupationType } from "@/database/fundiaryOccupationType";
 import { delDatabaseFundiaryUseType } from "@/database/fundiaryUseType";
 import { delDatabaseInspectionLocation } from "@/database/InspectionLocation";
@@ -83,16 +84,30 @@ async function getAll() {
     try {
         const { data } = await server.get("/search-all");
 
-        const { approach, permitType, fundiaryOccupationType, fundiaryUseType } = data;
+        const { approach, permitType } = data;
 
         await delDatabaseApproach(approach);
         await delDatabasePermitType(permitType)
-        await delDatabaseFundiaryOccupationType(fundiaryOccupationType)
-        await delDatabaseFundiaryUseType(fundiaryUseType)
     } catch (error) {
         return "Dados de configuração do app";
     }
 }
+// Função para pegar os dados de configuração fundária
+async function getFundiary() {
+    try {
+        const { data } = await server.get("/fundiary-search-all");
+
+        const { fundiaryOccupationType, fundiaryUseType, fundiaryEnvironmentalInfluenceType } = data;
+
+        await delDatabaseFundiaryOccupationType(fundiaryOccupationType)
+        await delDatabaseFundiaryUseType(fundiaryUseType)
+        await delDatabaseFundiaryEnvironmentalInfluenceType(fundiaryEnvironmentalInfluenceType)
+    } catch (error) {
+        return "Dados de configuração fundária";
+    }
+}
+
+
 
 export async function update() {
     const results = await Promise.allSettled([
@@ -101,6 +116,7 @@ export async function update() {
         getDriverType(),
         getViolationsCode(),
         getAll(),
+        getFundiary(),
     ]);
 
     // Coletar nomes dos erros

@@ -1,10 +1,10 @@
-import * as driverType from "@/database/schemas/driverTypeSchema";
-import { tableDriverType } from "./connection";
+import { driverType } from "@/database/schemas/driverTypeSchema";
+import { db } from "./connection";
 
 // Função para buscar no banco o tipo de condutor
 export async function getDatabaseDriverType() {
     try {
-        const response = await tableDriverType.query.driverType.findMany()
+        const response = await db.select().from(driverType);
         return response
     } catch (error) {
         console.log("getDatabaseDriverType error =>" + error);
@@ -13,8 +13,8 @@ export async function getDatabaseDriverType() {
 // Função para deletar no banco o tipo de condutor e adicionar os novos dados
 export async function delDatabaseDriverType(data: any) {
     try {
-        tableDriverType.delete(driverType.driverType).run();
-        tableDriverType.insert(driverType.driverType).values(data).run();
+        db.delete(driverType).run();
+        db.insert(driverType).values(data).run();
     } catch (error) {
         console.log("delDatabaseDriverType error =>" + error);
     }

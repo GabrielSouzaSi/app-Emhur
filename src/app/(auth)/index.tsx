@@ -4,18 +4,14 @@ import { FlatList, Text, View } from "react-native"
 
 import { HeaderMenu } from "@/components/headerMenu"
 import { MenuCard } from "@/components/menuCard"
+import { useAuth } from "@/hooks/useAuth"
 import { update } from "@/utils/configDataApp"
-
-type ViolationCode = {
-	id: number
-	code: string
-	description: string
-}
 
 type MenuItemBase = {
 	title: string
 	icon: string
 	route: string
+	allow?: boolean
 	empty?: false
 }
 
@@ -26,54 +22,70 @@ type MenuItemEmpty = {
 type MenuItem = MenuItemBase | MenuItemEmpty
 
 export default function HomeFiscal() {
+	const { can } = useAuth()
 	const versao = Constants.expoConfig?.version || "Desconhecida"
 
 	const router = useRouter()
 
-	const menuItems: MenuItem[] = [
+	const COLUMNS = 2
+
+	// 1) define o menu (com allow)
+	const menuItems: MenuItemBase[] = [
 		{
 			title: "Autuações",
 			icon: "shield-account-outline",
 			route: "/(auth)/historicoAutuacoes",
+			allow: can.hasTeam("DFT"),
 		},
 		{
 			title: "Vistorias",
 			icon: "checkbox-outline",
 			route: "/(auth)/menuVistoria",
+			allow: can.hasTeam("DFT"),
 		},
 		{
 			title: "Veículo",
 			icon: "car-outline",
 			route: "/(auth)/veiculo",
+			allow: can.hasTeam("DFT"),
 		},
 		{
 			title: "Fisc. Fundiária",
 			icon: "home-outline",
 			route: "/(auth)/fiscalizacaoFundiaria",
+			allow: can.hasTeam("GFF"),
 		},
 		{
 			title: "Frequência",
 			icon: "calendar-outline",
 			route: "/(auth)/frequency",
+			allow: can.hasTeam("DFT"),
+		},
+		{
+			title: "Create Form",
+			icon: "pencil-ruler",
+			route: "/(auth)/formBuilder",
+			allow: can.hasAnyTeam(["DFT", "GFF"]),
 		},
 	]
+
+	// 2) filtra só o que pode ver
+	const allowedMenu = menuItems.filter((item) => item.allow !== false)
 
 	function isMenuItemBase(item: MenuItem): item is MenuItemBase {
 		return !("empty" in item)
 	}
 
-	// Preenche a lista com espaços em branco
-	const COLUMNS = 2
-
-	const fillMenu = (): MenuItem[] => {
-		const remainder = menuItems.length % COLUMNS
-		if (remainder === 0) return menuItems
+	// 3) preenche o grid com espaços depois do filtro
+	const fillMenu = (items: MenuItemBase[]): MenuItem[] => {
+		const remainder = items.length % COLUMNS
+		if (remainder === 0) return items
 
 		const fillers: MenuItem[] = Array.from({ length: COLUMNS - remainder }, () => ({
 			empty: true,
 		}))
 
-		return [...menuItems, ...fillers]
+		return [...items, ...fillers]
 	}
 
 	return (
@@ -81,7 +93,7 @@ export default function HomeFiscal() {
 			<HeaderMenu onUpdate={update} />
 
 			<FlatList
-				data={fillMenu()}
+				data={fillMenu(allowedMenu)}
 				numColumns={COLUMNS}
 				keyExtractor={(_, index) => index.toString()}
 				contentContainerStyle={{ paddingHorizontal: 20 }}
@@ -102,6 +114,7 @@ export default function HomeFiscal() {
 					)
 				}
 			/>
+
 			<Text className="absolute bottom-2 left-4 text-sm text-gray-500">{`V.: ${versao}`}</Text>
 		</View>
 	)

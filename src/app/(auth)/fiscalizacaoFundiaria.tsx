@@ -1,6 +1,8 @@
+import * as FileSystem from "expo-file-system/legacy"
 import { useFocusEffect, useRouter } from "expo-router"
 import { useCallback, useState } from "react"
-import { Alert, Text, View } from "react-native"
+import { Alert, ScrollView, Text, View } from "react-native"
+import Share from "react-native-share"
 
 import { Button } from "@/components/button"
 import DataTableOffFundiary from "@/components/dataTableOffFundiary"
@@ -11,180 +13,196 @@ import {
 	delDatabaseFundiaryInspection,
 	getDatabaseFundiaryInspection,
 } from "@/database/fundiaryInspections"
-import { ImageDTO } from "@/dtos/imageDTO"
+import { FundiaryInspectionDTO } from "@/dtos/FundiaryInspectionDTO"
 import { server } from "@/server/api"
+import Toast from "react-native-toast-message"
 
 enum MODAL {
 	NONE = 0,
 	OPTIONS = 1,
 }
 
-type DBInspection = Record<string, any>
-
-/**
- * Formato que o DataTableOffFundiary espera (offline / banco)
- * (camelCase)
- */
-export type Historico = {
-	id: number
-	serviceOrderNumber: string
-	processNumber: string
-	processYear: string
-	requesterName: string
-	requesterContact: string
-	address: string
-	addressNumber: string
-	lotNumber: string
-	blockNumber: string
-	areaRegistrationOwner: string
-	occupationTypeId: string
-	useTypeId: string
-	environmentalInfluenceTypeId: string
-	observations: string
-	frontPhotos: any
-	edificationPhotos: any
-	portPhotos: any
-	perspectivePhotos: any
-	extraPhotos: any
-	latitude: string
-	longitude: string
-}
-
-/**
- * Formato que o backend espera
- * (snake_case)
- */
-type FundiaryInspectionForm = {
-	id?: number
-	service_order_number: string
-	process_number: string
-	process_year: string
-	requester_name: string
-	requester_contact: string
-	address: string
-	address_number: string
-	lot_number: string
-	block_number: string
-	area_registration_owner: string
-
-	occupation_type_id: string
-	use_type_id: string
-	environmental_influence_type_id: string
-
-	observations: string
-
-	front_photos: ImageDTO[]
-	edification_photos: ImageDTO[]
-	port_photos: ImageDTO[]
-	perspective_photos: ImageDTO[]
-	extra_photos: ImageDTO[]
-
-	latitude: string
-	longitude: string
-}
-
-const parsePhotos = (v: any): ImageDTO[] => {
-	if (Array.isArray(v)) return v
-	if (typeof v === "string") {
-		try {
-			const parsed = JSON.parse(v)
-			return Array.isArray(parsed) ? (parsed as ImageDTO[]) : []
-		} catch {
-			return []
-		}
-	}
-	return []
-}
-
-/**
- * Normaliza QUALQUER linha do banco para o formato Historico (camelCase),
- * para a tabela renderizar sem erro.
- */
-const normalizeHistorico = (row: DBInspection): Historico => ({
-	id: Number(row.id ?? 0),
-
-	serviceOrderNumber: String(row.serviceOrderNumber ?? row.service_order_number ?? ""),
-	processNumber: String(row.processNumber ?? row.process_number ?? ""),
-	processYear: String(row.processYear ?? row.process_year ?? ""),
-
-	requesterName: String(row.requesterName ?? row.requester_name ?? ""),
-	requesterContact: String(row.requesterContact ?? row.requester_contact ?? ""),
-
-	address: String(row.address ?? ""),
-	addressNumber: String(row.addressNumber ?? row.address_number ?? ""),
-	lotNumber: String(row.lotNumber ?? row.lot_number ?? ""),
-	blockNumber: String(row.blockNumber ?? row.block_number ?? ""),
-
-	areaRegistrationOwner: String(row.areaRegistrationOwner ?? row.area_registration_owner ?? ""),
-
-	occupationTypeId: String(row.occupationTypeId ?? row.occupation_type_id ?? ""),
-	useTypeId: String(row.useTypeId ?? row.use_type_id ?? ""),
-	environmentalInfluenceTypeId: String(
-		row.environmentalInfluenceTypeId ?? row.environmental_influence_type_id ?? "",
-	),
-
-	observations: String(row.observations ?? "Sem observações"),
-
-	// aqui pode vir array ou string JSON ou null, então guardamos "cru"
-	frontPhotos: row.frontPhotos ?? row.front_photos ?? "[]",
-	edificationPhotos: row.edificationPhotos ?? row.edification_photos ?? "[]",
-	portPhotos: row.portPhotos ?? row.port_photos ?? "[]",
-	perspectivePhotos: row.perspectivePhotos ?? row.perspective_photos ?? "[]",
-	extraPhotos: row.extraPhotos ?? row.extra_photos ?? "[]",
-
-	latitude: String(row.latitude ?? ""),
-	longitude: String(row.longitude ?? ""),
-})
-
-/**
- * Converte Historico (camelCase) -> FundiaryInspectionForm (snake_case),
- * já parseando as fotos.
- */
-const toApiForm = (h: Historico): FundiaryInspectionForm => ({
-	id: h.id,
-
-	service_order_number: h.serviceOrderNumber,
-	process_number: h.processNumber,
-	process_year: h.processYear,
-
-	requester_name: h.requesterName,
-	requester_contact: h.requesterContact,
-
-	address: h.address,
-	address_number: h.addressNumber,
-	lot_number: h.lotNumber,
-	block_number: h.blockNumber,
-
-	area_registration_owner: h.areaRegistrationOwner,
-
-	occupation_type_id: h.occupationTypeId,
-	use_type_id: h.useTypeId,
-	environmental_influence_type_id: h.environmentalInfluenceTypeId,
-
-	observations: h.observations ?? "Sem observações",
-
-	front_photos: parsePhotos(h.frontPhotos),
-	edification_photos: parsePhotos(h.edificationPhotos),
-	port_photos: parsePhotos(h.portPhotos),
-	perspective_photos: parsePhotos(h.perspectivePhotos),
-	extra_photos: parsePhotos(h.extraPhotos),
-
-	latitude: h.latitude,
-	longitude: h.longitude,
-})
-
 export default function HistoricoFiscalizacaoFundiaria() {
 	const [isLoaded, setIsLoaded] = useState(false)
 	const [modal, setModal] = useState(MODAL.NONE)
-
-	const [inspectionsFundiary, setInspectionsFundiary] = useState<Historico[]>([])
-	const [selectedInspection, setSelectedInspection] = useState<Historico | null>(null)
+	const [inspectionsFundiary, setInspectionsFundiary] = useState([])
+	const [selectedInspection, setSelectedInspection] = useState<FundiaryInspectionDTO | null>(null)
+	const [rawJson, setRawJson] = useState<string | null>(null)
 
 	const router = useRouter()
 
-	const handleOption = (item: Historico) => {
+	const handleOption = (item: FundiaryInspectionDTO) => {
 		setSelectedInspection(item)
 		setModal(MODAL.OPTIONS)
+	}
+
+	function buildRawPayload(item: FundiaryInspectionDTO) {
+		return {
+			service_order_number: item.serviceOrderNumber ?? "",
+			process_number: item.processNumber ?? "",
+			process_year: item.processYear ?? "",
+			requester_name: item.requesterName ?? "",
+			requester_contact: item.requesterContact ?? "",
+			address: item.address ?? "",
+			address_number: item.addressNumber ?? "",
+			lot_number: item.lotNumber ?? "",
+			block_number: item.blockNumber ?? "",
+			area_registration_owner: item.areaRegistrationOwner ?? "",
+			occupation_type_id: item.occupationTypeId ? String(item.occupationTypeId) : "",
+			use_type_id: item.useTypeId ? String(item.useTypeId) : "",
+			environmental_influence_type_id: item.environmentalInfluenceTypeId
+				? String(item.environmentalInfluenceTypeId)
+				: "",
+			observations: item.observations ?? "",
+			latitude: item.latitude ?? "",
+			longitude: item.longitude ?? "",
+			auto_number: "",
+			inspection_date: item.date ?? "",
+			inspection_time: item.time ?? "",
+			confrontation_right: item.confrontationRight ?? "",
+			confrontation_left: item.confrontationLeft ?? "",
+			confrontation_back: item.confrontationBack ?? "",
+			zone: item.zone ?? "",
+			front_photos: item.frontPhotos ?? [],
+			edification_photos: item.edificationPhotos ?? [],
+			port_photos: item.portPhotos ?? [],
+			perspective_photos: item.perspectivePhotos ?? [],
+			extra_photos: item.extraPhotos ?? [],
+		}
+	}
+
+	function buildShareMessage(item: FundiaryInspectionDTO) {
+		return `
+FISCALIZAÇÃO FUNDIÁRIA
+
+Ordem de Serviço: ${item.serviceOrderNumber || "-"}
+Processo: ${item.processNumber || "-"}
+Ano do Processo: ${item.processYear || "-"}
+Requerente: ${item.requesterName || "-"}
+Contato: ${item.requesterContact || "-"}
+Endereço: ${item.address || "-"}
+Número: ${item.addressNumber || "-"}
+Lote: ${item.lotNumber || "-"}
+Quadra: ${item.blockNumber || "-"}
+Proprietário do Registro: ${item.areaRegistrationOwner || "-"}
+Zona: ${item.zone || "-"}
+
+Confrontação Direita: ${item.confrontationRight || "-"}
+Confrontação Esquerda: ${item.confrontationLeft || "-"}
+Confrontação Fundos: ${item.confrontationBack || "-"}
+
+Latitude: ${item.latitude || "-"}
+Longitude: ${item.longitude || "-"}
+Data: ${item.date || "-"}
+Hora: ${item.time || "-"}
+
+Observações:
+${item.observations || "Sem observações"}
+`.trim()
+	}
+
+	const viewRawJsonSelected = () => {
+		if (!selectedInspection) return
+
+		const payload = buildRawPayload(selectedInspection)
+		const json = JSON.stringify(payload, null, 2)
+
+		//console.log("JSON PURO FUNDIÁRIA:\n", json)
+		setRawJson(json)
+	}
+
+	async function prepareImagesForShare(item: FundiaryInspectionDTO) {
+		const photos = [
+			...(item.frontPhotos || []),
+			...(item.edificationPhotos || []),
+			...(item.portPhotos || []),
+			...(item.perspectivePhotos || []),
+			...(item.extraPhotos || []),
+		]
+
+		const rawUris = photos
+			.map((photo: any) => photo?.uri || "")
+			.filter(Boolean)
+			.map((uri: string) => (uri.startsWith("file://") ? uri : `file://${uri}`))
+
+		const preparedUris: string[] = []
+
+		for (let i = 0; i < rawUris.length; i++) {
+			const uri = rawUris[i]
+
+			try {
+				const info = await FileSystem.getInfoAsync(uri)
+
+				if (!info.exists) {
+					console.log("Arquivo não existe:", uri)
+					continue
+				}
+
+				const extensionMatch = uri.match(/\.(jpg|jpeg|png|webp)$/i)
+				const extension = extensionMatch?.[1]?.toLowerCase() || "jpg"
+
+				const destUri = `${FileSystem.cacheDirectory}share_${Date.now()}_${i}.${extension}`
+
+				await FileSystem.copyAsync({
+					from: uri,
+					to: destUri,
+				})
+
+				preparedUris.push(destUri)
+			} catch (error) {
+				console.log("Erro ao preparar imagem para compartilhamento:", uri, error)
+			}
+		}
+
+		return preparedUris
+	}
+
+	async function cleanupSharedFiles(uris: string[]) {
+		for (const uri of uris) {
+			try {
+				const info = await FileSystem.getInfoAsync(uri)
+				if (info.exists) {
+					await FileSystem.deleteAsync(uri, { idempotent: true })
+				}
+			} catch (error) {
+				console.log("Erro ao limpar arquivo compartilhado:", uri, error)
+			}
+		}
+	}
+
+	const shareFundiaryInspectionSelected = async () => {
+		if (!selectedInspection) return
+
+		let preparedUris: string[] = []
+
+		try {
+			setModal(MODAL.NONE)
+			setIsLoaded(true)
+
+			const preparedUris = await prepareImagesForShare(selectedInspection)
+
+			// console.log("Total de imagens preparadas:", preparedUris.length)
+			// console.log("URIs:", preparedUris)
+
+			if (preparedUris.length === 0) {
+				Alert.alert("Atenção!", "Nenhuma imagem válida encontrada.")
+				return
+			}
+
+			await Share.open({
+				title: "Fiscalização Fundiária",
+				message: buildShareMessage(selectedInspection),
+				urls: preparedUris,
+				type: "image/*",
+				failOnCancel: false,
+			})
+		} catch (error) {
+			console.log("ERRO AO COMPARTILHAR FUNDIÁRIA:", error)
+			Alert.alert("Atenção!", "Não foi possível compartilhar a fiscalização.")
+		} finally {
+			await cleanupSharedFiles(preparedUris)
+			setIsLoaded(false)
+		}
 	}
 
 	const sendFundiaryInspectionSelected = async () => {
@@ -194,44 +212,76 @@ export default function HistoricoFiscalizacaoFundiaria() {
 		setIsLoaded(true)
 
 		try {
-			const i = toApiForm(selectedInspection)
-
 			const formData = new FormData()
-			formData.append("service_order_number", i.service_order_number)
-			formData.append("process_number", i.process_number)
-			formData.append("process_year", i.process_year)
-			formData.append("requester_name", i.requester_name)
-			formData.append("requester_contact", i.requester_contact)
-			formData.append("address", i.address)
-			formData.append("address_number", i.address_number)
-			formData.append("lot_number", i.lot_number)
-			formData.append("block_number", i.block_number)
-			formData.append("area_registration_owner", i.area_registration_owner)
 
-			formData.append("occupation_type_id", i.occupation_type_id)
-			formData.append("use_type_id", i.use_type_id)
-			formData.append("environmental_influence_type_id", i.environmental_influence_type_id)
+			formData.append("service_order_number", selectedInspection.serviceOrderNumber ?? "")
+			formData.append("process_number", selectedInspection.processNumber ?? "")
+			formData.append("process_year", selectedInspection.processYear ?? "")
+			formData.append("requester_name", selectedInspection.requesterName ?? "")
+			formData.append("requester_contact", selectedInspection.requesterContact ?? "")
+			formData.append("address", selectedInspection.address ?? "")
+			formData.append("address_number", selectedInspection.addressNumber ?? "")
+			formData.append("lot_number", selectedInspection.lotNumber ?? "")
+			formData.append("block_number", selectedInspection.blockNumber ?? "")
+			formData.append(
+				"area_registration_owner",
+				selectedInspection.areaRegistrationOwner ?? "",
+			)
 
-			formData.append("observations", i.observations)
+			formData.append(
+				"occupation_type_id",
+				selectedInspection.occupationTypeId
+					? String(selectedInspection.occupationTypeId)
+					: "",
+			)
+			formData.append(
+				"use_type_id",
+				selectedInspection.useTypeId ? String(selectedInspection.useTypeId) : "",
+			)
+			formData.append(
+				"environmental_influence_type_id",
+				selectedInspection.environmentalInfluenceTypeId
+					? String(selectedInspection.environmentalInfluenceTypeId)
+					: "",
+			)
 
-			i.front_photos.forEach((p) => formData.append("front_photos[]", p as any))
-			i.edification_photos.forEach((p) => formData.append("edification_photos[]", p as any))
-			i.port_photos.forEach((p) => formData.append("port_photos[]", p as any))
-			i.perspective_photos.forEach((p) => formData.append("perspective_photos[]", p as any))
-			i.extra_photos.forEach((p) => formData.append("extra_photos[]", p as any))
+			formData.append("observations", selectedInspection.observations ?? "")
 
-			formData.append("latitude", i.latitude)
-			formData.append("longitude", i.longitude)
+			selectedInspection.frontPhotos?.forEach((p: any) =>
+				formData.append("front_photos[]", p),
+			)
+			selectedInspection.edificationPhotos?.forEach((p: any) =>
+				formData.append("edification_photos[]", p),
+			)
+			selectedInspection.portPhotos?.forEach((p: any) => formData.append("port_photos[]", p))
+			selectedInspection.perspectivePhotos?.forEach((p: any) =>
+				formData.append("perspective_photos[]", p),
+			)
+			selectedInspection.extraPhotos?.forEach((p: any) =>
+				formData.append("extra_photos[]", p),
+			)
+
+			formData.append("latitude", selectedInspection.latitude ?? "")
+			formData.append("longitude", selectedInspection.longitude ?? "")
 
 			formData.append("auto_number", "")
-			formData.append("inspection_date", "")
-			formData.append("inspection_time", "")
+			formData.append("inspection_date", selectedInspection.date ?? "")
+			formData.append("inspection_time", selectedInspection.time ?? "")
+
+			formData.append("confrontation_right", selectedInspection.confrontationRight ?? "")
+			formData.append("confrontation_left", selectedInspection.confrontationLeft ?? "")
+			formData.append("confrontation_back", selectedInspection.confrontationBack ?? "")
+			formData.append("zone", selectedInspection.zone ?? "")
 
 			await server.postForm("/fundiary-inspections", formData)
 
-			if (i.id) await delDatabaseFundiaryInspection(i.id)
-
-			Alert.alert("Sucesso!", "Fiscalização enviada com sucesso!")
+			if (selectedInspection.id) {
+				await delDatabaseFundiaryInspection(selectedInspection.id)
+			}
+			Toast.show({
+				type: "success",
+				text1: "Fiscalização enviada com sucesso!",
+			})
 			await getInspectionsFundiary()
 		} catch (error: any) {
 			console.log("ERRO ENVIO FUNDIÁRIA:", error?.response?.data ?? error)
@@ -239,6 +289,17 @@ export default function HistoricoFiscalizacaoFundiaria() {
 		} finally {
 			setIsLoaded(false)
 		}
+	}
+
+	const viewFundiaryInspectionSelected = () => {
+		if (!selectedInspection) return
+
+		router.push({
+			pathname: "/(auth)/fundiariaForm",
+			params: { id: selectedInspection.id },
+		})
+
+		setModal(MODAL.NONE)
 	}
 
 	const confirmDeleteFundiaryInspection = () => {
@@ -270,7 +331,9 @@ export default function HistoricoFiscalizacaoFundiaria() {
 	async function getInspectionsFundiary() {
 		try {
 			const response = await getDatabaseFundiaryInspection()
-			setInspectionsFundiary((response as any[]).map(normalizeHistorico))
+			//console.log(response)
+
+			setInspectionsFundiary(response)
 		} catch (error) {
 			Alert.alert("Atenção!", "Erro ao buscar as fiscalizações fundiárias no banco!")
 		}
@@ -285,14 +348,14 @@ export default function HistoricoFiscalizacaoFundiaria() {
 
 	return (
 		<View className="flex-1">
-			<HeaderBack title="Histórico de Fiscalizações" variant="primary" />
+			<HeaderBack title="Histórico" variant="primary" />
 
 			{isLoaded && <LoadingLight />}
 
-			{inspectionsFundiary[0] ? (
+			{inspectionsFundiary.length > 0 ? (
 				<>
-					<View className="mt-4 mx-4">
-						<Text className="text-gray-500 font-regular text-2xl font-bold">
+					<View className="mx-4 mt-4">
+						<Text className="font-regular text-2xl font-bold text-gray-500">
 							Fiscalizações Pendentes ({inspectionsFundiary.length}):
 						</Text>
 					</View>
@@ -300,14 +363,14 @@ export default function HistoricoFiscalizacaoFundiaria() {
 					<DataTableOffFundiary data={inspectionsFundiary} onSend={handleOption} />
 				</>
 			) : (
-				<View className="m-4 bg-white border-2 rounded-md border-gray-300">
+				<View className="m-4 rounded-md border-2 border-gray-300 bg-white">
 					<View className="border-b-2 border-gray-300">
-						<Text className="ml-2 my-2 text-gray-500 font-regular text-2xl font-bold">
+						<Text className="font-regular my-2 ml-2 text-2xl font-bold text-gray-500">
 							Aviso!
 						</Text>
 					</View>
-					<View className="justify-center items-center">
-						<Text className="my-4 text-gray-500 font-regular text-base font-bold">
+					<View className="items-center justify-center">
+						<Text className="font-regular my-4 text-base font-bold text-gray-500">
 							Sem pendência local.
 						</Text>
 					</View>
@@ -315,16 +378,28 @@ export default function HistoricoFiscalizacaoFundiaria() {
 			)}
 
 			<View className="m-4">
-				<Button variant="primary" onPress={() => router.push("/(auth)/fundiariaForm")}>
-					<Button.TextButton title="Fomulário" />
+				<Button variant="primary" onPress={() => router.push("/(auth)/fundiariaFormold")}>
+					<Button.TextButton title="Formulário" />
 				</Button>
 			</View>
 
 			<Modal isOpen={modal === MODAL.OPTIONS}>
-				<View className="bg-white w-full p-4 rounded-xl">
+				<View className="w-full rounded-xl bg-white p-4">
 					<View className="gap-5">
+						<Button variant="primary" onPress={viewFundiaryInspectionSelected}>
+							<Button.TextButton title="Visualizar" />
+						</Button>
+
+						<Button variant="primary" onPress={viewRawJsonSelected}>
+							<Button.TextButton title="Visualizar JSON puro" />
+						</Button>
+
+						<Button variant="primary" onPress={shareFundiaryInspectionSelected}>
+							<Button.TextButton title="Compartilhar c/ imagens" />
+						</Button>
+
 						<Button variant="primary" onPress={sendFundiaryInspectionSelected}>
-							<Button.TextButton title="Enviar" />
+							<Button.TextButton title="Enviar completo" />
 						</Button>
 
 						<Button variant="primary" onPress={confirmDeleteFundiaryInspection}>
@@ -332,6 +407,24 @@ export default function HistoricoFiscalizacaoFundiaria() {
 						</Button>
 
 						<Button variant="primary" onPress={() => setModal(MODAL.NONE)}>
+							<Button.TextButton title="Fechar" />
+						</Button>
+					</View>
+				</View>
+			</Modal>
+			<Modal isOpen={rawJson !== null}>
+				<View className="w-full h-[80%] bg-white rounded-xl p-4">
+					<Text className="text-lg font-bold mb-4">JSON da Fiscalização</Text>
+
+					<ScrollView
+						contentContainerStyle={{ paddingBottom: 20 }}
+						className="flex-1 bg-gray-100 rounded p-3"
+					>
+						<Text className="text-xs text-gray-700">{rawJson}</Text>
+					</ScrollView>
+
+					<View className="mt-4">
+						<Button variant="primary" onPress={() => setRawJson(null)}>
 							<Button.TextButton title="Fechar" />
 						</Button>
 					</View>

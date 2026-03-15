@@ -1,10 +1,10 @@
-import * as permitTypeSchema from "@/database/schemas/permitTypeSchema";
-import { tablePermitType } from "./connection";
+import { permitType } from "@/database/schemas/permitTypeSchema";
+import { db } from "./connection";
 
 // Função para buscar no banco o tipo de Alvará
 export async function getDatabasePermitType() {
     try {
-        const response = await tablePermitType.query.permitType.findMany()
+        const response = await db.select().from(permitType);
         return response
     } catch (error) {
         console.log("getDatabasePermitType error =>" + error);
@@ -13,8 +13,8 @@ export async function getDatabasePermitType() {
 // Função para deletar no banco e adicionar o tipo de Alvará
 export async function delDatabasePermitType(data: any) {
     try {
-        tablePermitType.delete(permitTypeSchema.permitType).run();
-        tablePermitType.insert(permitTypeSchema.permitType).values(data).run();
+        db.delete(permitType).run();
+        db.insert(permitType).values(data).run();
     } catch (error) {
         console.log("delDatabasePermitType error =>" + error);
     }

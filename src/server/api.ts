@@ -1,7 +1,7 @@
 import axios, { AxiosError } from "axios";
 const server = axios.create({
     baseURL: process.env.EXPO_PUBLIC_API_URL,
-    timeout: 120000
+    timeout: 180000
 });
 
 server.interceptors.request.use((response) => {

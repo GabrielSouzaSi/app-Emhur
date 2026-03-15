@@ -1,7 +1,7 @@
 {
   "name": "appfiscal",
   "main": "expo-router/entry",
-  "version": "1.0.3",
+  "version": "1.0.10",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -30,6 +30,7 @@
     "expo-file-system": "~19.0.21",
     "expo-font": "~14.0.10",
     "expo-haptics": "~15.0.8",
+    "expo-image-manipulator": "~14.0.8",
     "expo-image-picker": "~17.0.10",
     "expo-linking": "~8.0.10",
     "expo-location": "~19.0.8",
@@ -54,6 +55,7 @@
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
+    "react-native-share": "^12.2.5",
     "react-native-signature-canvas": "^5.0.1",
     "react-native-svg": "15.12.1",
     "react-native-toast-message": "^2.3.3",

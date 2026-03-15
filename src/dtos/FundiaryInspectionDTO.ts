@@ -1,0 +1,30 @@
+export type FundiaryInspectionDTO = {
+  id: number
+  serviceOrderNumber: string
+  processNumber: string
+  processYear: string
+  requesterName: string
+  requesterContact: string
+  address: string
+  addressNumber: string
+  lotNumber: string
+  blockNumber: string
+  areaRegistrationOwner: string
+  occupationTypeId: number
+  useTypeId: number
+  environmentalInfluenceTypeId: number
+  observations: string
+  frontPhotos: any
+  edificationPhotos: any
+  portPhotos: any
+  perspectivePhotos: any
+  extraPhotos: any
+  latitude: string
+  longitude: string
+  date: string
+  time: string
+  confrontationRight: string
+  confrontationLeft: string
+  confrontationBack: string
+  zone: string
+}

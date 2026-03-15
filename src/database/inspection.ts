@@ -1,11 +1,11 @@
-import * as inspectionsSchema from "@/database/schemas/inspectionsSchema";
+import { inspections } from "@/database/schemas/inspectionsSchema";
 import { eq } from "drizzle-orm";
-import { tableInspections } from "./connection";
+import { db } from "./connection";
 
 // Função para buscar as vistorias no banco 
 export async function getDatabaseInspections() {
   try {
-    const response = await tableInspections.query.inspections.findMany()
+    const response = await db.select().from(inspections);
     return response
   } catch (error) {
     console.log("getDatabaseViolations error =>" + error);
@@ -14,7 +14,7 @@ export async function getDatabaseInspections() {
 // Função para deletar no banco a vistoria por ID
 export async function delDatabaseInspectionId(id: number) {
   try {
-    await tableInspections.delete(inspectionsSchema.inspections).where(eq(inspectionsSchema.inspections.id, id));
+    await db.delete(inspections).where(eq(inspections.id, id));
     return true
   } catch (error) {
     console.log("delDatabaseViolationId error =>" + error);
@@ -23,7 +23,7 @@ export async function delDatabaseInspectionId(id: number) {
 // Função para adicionar no banco a vistoria
 export async function addDatabaseInspection(data: any) {
   try {
-    tableInspections.insert(inspectionsSchema.inspections).values(data).run();
+    db.insert(inspections).values(data).run();
     return true
   } catch (error) {
     console.log("addDatabaseViolation error =>" + error);

@@ -6,7 +6,7 @@ import colors from "tailwindcss/colors"
 type Historico = {
 	requesterName: string
 	processNumber: string
-	processYear: string
+	serviceOrderNumber: string
 }
 
 type DataTableProps = {
@@ -33,7 +33,7 @@ const DataTableOffFundiary: React.FC<DataTableProps> = ({ data, onEdit, onSend }
 					<Text className="text-gray-500 font-regular text-lg font-bold">Processo</Text>
 				</View>
 				<View className="flex-1">
-					<Text className="text-gray-500 font-regular text-lg font-bold">Ano</Text>
+					<Text className="text-gray-500 font-regular text-lg font-bold">Serviço</Text>
 				</View>
 				<View className="flex">
 					<Text className="text-gray-500 font-regular text-lg font-bold">Ações</Text>
@@ -51,7 +51,7 @@ const DataTableOffFundiary: React.FC<DataTableProps> = ({ data, onEdit, onSend }
 							<Text>{item.processNumber}</Text>
 						</View>
 						<View className="flex-1">
-							<Text>{item.processYear}</Text>
+							<Text>{item.serviceOrderNumber}</Text>
 						</View>
 						<View className="flex">
 							<TouchableOpacity onPress={() => onSend(item)}>

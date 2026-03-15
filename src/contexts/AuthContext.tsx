@@ -2,6 +2,14 @@ import { createContext, ReactNode, useEffect, useMemo, useState } from "react"
 
 import { storageUserGet, storageUserRemove, storageUserSave } from "@/storage/storageUser"
 
+import {
+	getUserRoles,
+	getUserTeams,
+	hasAnyRole,
+	hasAnyTeam,
+	hasRole,
+	hasTeam,
+} from "@/auth/permissions"
 import { UserDTO } from "@/dtos/userDTO"
 import { server } from "@/server/api"
 import {
@@ -13,8 +21,19 @@ import { update } from "@/utils/configDataApp"
 
 export type AuthContextDataProps = {
 	user: UserDTO | null
-	isBootstrapping: boolean // <— só no boot
-	authSubmitting: boolean // <— login/logout em andamento
+	roles: string[]
+	teams: string[]
+
+	can: {
+		hasRole: (role: string) => boolean
+		hasAnyRole: (roles: string[]) => boolean
+		hasTeam: (alias: string) => boolean
+		hasAnyTeam: (aliases: string[]) => boolean
+	}
+
+	isBootstrapping: boolean
+	authSubmitting: boolean
+
 	signIn: (email: string, password: string) => Promise<void>
 	signOut: () => Promise<void>
 }
@@ -26,7 +45,7 @@ type AuthContextProviderProps = {
 export const AuthContext = createContext<AuthContextDataProps>({} as AuthContextDataProps)
 
 export function AuthContextProvider({ children }: AuthContextProviderProps) {
-	const [user, setUser] = useState<UserDTO>({} as UserDTO)
+	const [user, setUser] = useState<UserDTO | null>(null)
 	const [isBootstrapping, setIsBootstrapping] = useState(true)
 	const [authSubmitting, setAuthSubmitting] = useState(false)
 
@@ -89,9 +108,31 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
 		loadUserData()
 	}, [])
 
+	const roles = useMemo(() => getUserRoles(user), [user])
+	const teams = useMemo(() => getUserTeams(user), [user])
+
+	const can = useMemo(
+		() => ({
+			hasRole: (role: string) => hasRole(user, role),
+			hasAnyRole: (rolesList: string[]) => hasAnyRole(user, rolesList),
+			hasTeam: (alias: string) => hasTeam(user, alias),
+			hasAnyTeam: (aliases: string[]) => hasAnyTeam(user, aliases),
+		}),
+		[user],
+	)
+
 	const value = useMemo(
-		() => ({ user, isBootstrapping, authSubmitting, signIn, signOut }),
-		[user, isBootstrapping, authSubmitting]
+		() => ({
+			user,
+			roles,
+			teams,
+			can,
+			isBootstrapping,
+			authSubmitting,
+			signIn,
+			signOut,
+		}),
+		[user, roles, teams, can, isBootstrapping, authSubmitting],
 	)
 
 	return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
