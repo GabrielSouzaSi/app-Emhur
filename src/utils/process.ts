@@ -1,17 +1,23 @@
 // utils/process.ts
-export function maskProcess(value: string) {
-    let cleaned = (value ?? "").replace(/[^\d/]/g, "")
-
-    const parts = cleaned.split("/")
-
-    // só permite uma barra
-    if (parts.length > 2) {
-        cleaned = `${parts[0]}/${parts[1]}`
-    }
-
-    return cleaned
-}
+const currentdate = new Date()
+const date = currentdate.getFullYear() + 1
 
 export function isValidProcess(value: string) {
-    return /^\d+\/\d{4}$/.test((value ?? "").trim())
+    const raw = String(value ?? "").trim()
+
+    // formato: qualquer quantidade de dígitos + / + 4 dígitos
+    const regex = /^\d+\/\d{4}$/
+
+    if (!regex.test(raw)) return false
+
+    const [numberPart, yearPart] = raw.split("/")
+
+    if (!numberPart) return false
+    if (!yearPart || yearPart.length !== 4) return false
+
+    const year = Number(yearPart)
+    if (Number.isNaN(year)) return false
+    if (year < currentdate.getFullYear() - 6 || year > date) return false
+
+    return true
 }

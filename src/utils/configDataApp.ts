@@ -1,5 +1,4 @@
 import { server } from "@/server/api";
-import { Alert } from "react-native";
 
 import { delDatabaseApproach } from "@/database/approach";
 import { delDatabaseDriverType } from "@/database/driverTypes";
@@ -7,6 +6,7 @@ import { delDatabaseFundiaryEnvironmentalInfluenceType } from "@/database/fundia
 import { delDatabaseFundiaryOccupationType } from "@/database/fundiaryOccupationType";
 import { delDatabaseFundiaryUseType } from "@/database/fundiaryUseType";
 import { delDatabaseInspectionLocation } from "@/database/InspectionLocation";
+import { delDatabaseNeighborhood } from "@/database/neighborhood";
 import { delDatabasePermitType } from "@/database/permitType";
 import { delDatabaseReason } from "@/database/reason";
 import { delDatabaseViolationCode } from "@/database/violationsCode";
@@ -30,33 +30,32 @@ async function getViolationsCode() {
         const { data } = await server.get(`/violations-code`);
         // console.log("violations => ", data);
 
-        const violationsCodeData = await data.map((item: any) => ({
-            id: item.id,
-            code: item.code,
-            description: item.description,
-            permitTypes: item.permit_types.map((permitType: any) => ({
-                id: permitType.id,
-                name: permitType.name,
-            })),
-        }));
+        const result = []
+
+        data.forEach(item => {
+            item.permit_types.forEach(pt => {
+                result.push({
+                    id: Number(`${item.id}${pt.id}`),
+                    code: item.code,
+                    description: item.description,
+                    permitTypeId: pt.id
+                })
+            })
+        })
 
         // Remover e adicionar no banco os codigos de autuação
-        await delDatabaseViolationCode(violationsCodeData);
+        await delDatabaseViolationCode(result);
     } catch (error) {
         return "Códigos de Autuações";
     }
 }
-// Função para receber o modo de abordagem
-async function getApproach() {
+// Função para receber os bairros
+async function getNeighborhoods() {
     try {
-        const { data } = await server.get(`/vehicle/1`);
-        const { approach } = data;
-        await delDatabaseApproach(approach);
+        const { data } = await server.get(`/neighborhoods`);
+        await delDatabaseNeighborhood(data);
     } catch (error) {
-        Alert.alert(
-            "Aviso!",
-            "Não foi possível carregar o modo de abordagem. Tente novamente."
-        );
+        return "Lista de Bairros!";
     }
 }
 // Função para receber o tipo de condutor
@@ -117,6 +116,7 @@ export async function update() {
         getViolationsCode(),
         getAll(),
         getFundiary(),
+        getNeighborhoods()
     ]);
 
     // Coletar nomes dos erros

@@ -1,11 +1,11 @@
-// utils/cpfCnpj.ts
+//src/utils/cpfCnpj.ts
 export function onlyDigits(v: string) {
     return (v ?? "").replace(/\D/g, "")
 }
 
 export function maskCPF(value: string) {
     const d = onlyDigits(value).slice(0, 11)
-    // 000.000.000-00
+
     return d
         .replace(/^(\d{3})(\d)/, "$1.$2")
         .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
@@ -14,7 +14,7 @@ export function maskCPF(value: string) {
 
 export function maskCNPJ(value: string) {
     const d = onlyDigits(value).slice(0, 14)
-    // 00.000.000/0000-00
+
     return d
         .replace(/^(\d{2})(\d)/, "$1.$2")
         .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
@@ -27,7 +27,6 @@ export function maskCpfCnpj(value: string) {
     return d.length <= 11 ? maskCPF(d) : maskCNPJ(d)
 }
 
-// -------- validação CPF
 export function isValidCPF(value: string) {
     const cpf = onlyDigits(value)
     if (cpf.length !== 11) return false
@@ -43,10 +42,10 @@ export function isValidCPF(value: string) {
     for (let i = 0; i < 10; i++) sum += Number(cpf[i]) * (11 - i)
     let d2 = 11 - (sum % 11)
     if (d2 >= 10) d2 = 0
+
     return d2 === Number(cpf[10])
 }
 
-// -------- validação CNPJ
 export function isValidCNPJ(value: string) {
     const cnpj = onlyDigits(value)
     if (cnpj.length !== 14) return false
@@ -54,7 +53,9 @@ export function isValidCNPJ(value: string) {
 
     const calcDigit = (base: string, weights: number[]) => {
         let sum = 0
-        for (let i = 0; i < weights.length; i++) sum += Number(base[i]) * weights[i]
+        for (let i = 0; i < weights.length; i++) {
+            sum += Number(base[i]) * weights[i]
+        }
         const mod = sum % 11
         return mod < 2 ? 0 : 11 - mod
     }
