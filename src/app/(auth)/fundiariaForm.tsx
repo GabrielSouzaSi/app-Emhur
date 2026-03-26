@@ -470,7 +470,7 @@ export default function FundiaryInspectionForm() {
 			Toast.show({ type: "success", text1: "Formulário enviado com sucesso!" })
 			router.back()
 		} catch (error: any) {
-			//console.log("⚠️ Falha no envio, salvando offline:", error?.message)
+			// console.log("⚠️ Falha no envio, salvando offline:", error?.message)
 			// console.log("ERRO ENVIO FUNDIÁRIA -> message:", error?.message)
 			// console.log("ERRO ENVIO FUNDIÁRIA -> status:", error?.response?.status)
 			// console.log("ERRO ENVIO FUNDIÁRIA -> data:", error?.response?.data)
@@ -696,9 +696,9 @@ export default function FundiaryInspectionForm() {
 									rules={{
 										validate: (v) => {
 											if (!v || !v.trim()) return true
-											return v.trim().length >= 14 || "Contato muito curto!"
+											return v.trim().length >= 0 || "Contato muito curto!"
 										},
-										required: "Informe o contato!",
+										// required: "Informe o contato!",
 									}}
 									render={({
 										field: { onChange, value, ref },
@@ -730,7 +730,7 @@ export default function FundiaryInspectionForm() {
 								<Controller
 									control={control}
 									name="address"
-									rules={{ required: "Informe o endereço" }}
+									// rules={{ required: "Informe o endereço" }}
 									render={({
 										field: { onChange, value, ref },
 										fieldState: { error },
@@ -758,7 +758,7 @@ export default function FundiaryInspectionForm() {
 								<Controller
 									control={control}
 									name="neighborhood_id"
-									rules={{ required: "Selecione o Bairro!" }}
+									// rules={{ required: "Selecione o Bairro!" }}
 									render={({
 										field: { onChange, value, ref },
 										fieldState: { error },
@@ -814,7 +814,7 @@ export default function FundiaryInspectionForm() {
 										<Controller
 											control={control}
 											name="lot_number"
-											rules={{ required: "Obrigatório!" }}
+											// rules={{ required: "Obrigatório!" }}
 											render={({
 												field: { onChange, value, ref },
 												fieldState: { error },
@@ -842,7 +842,7 @@ export default function FundiaryInspectionForm() {
 										<Controller
 											control={control}
 											name="block_number"
-											rules={{ required: "Obrigatório!" }}
+											// rules={{ required: "Obrigatório!" }}
 											render={({
 												field: { onChange, value, ref },
 												fieldState: { error },
@@ -870,7 +870,7 @@ export default function FundiaryInspectionForm() {
 										<Controller
 											control={control}
 											name="zone"
-											rules={{ required: "Obrigatório!" }}
+											// rules={{ required: "Obrigatório!" }}
 											render={({
 												field: { onChange, value, ref },
 												fieldState: { error },
@@ -983,14 +983,14 @@ export default function FundiaryInspectionForm() {
 							<Controller
 								control={control}
 								name="latitude"
-								rules={{ required: "Marque a posição GPS" }}
+								// rules={{ required: "Marque a posição GPS" }}
 								render={() => null}
 							/>
 
 							<Controller
 								control={control}
 								name="longitude"
-								rules={{ required: "Marque a posição GPS" }}
+								// rules={{ required: "Marque a posição GPS" }}
 								render={() => null}
 							/>
 
@@ -1048,7 +1048,7 @@ export default function FundiaryInspectionForm() {
 								<Controller
 									control={control}
 									name="occupation_type_id"
-									rules={{ required: "Selecione o tipo de ocupação!" }}
+									// rules={{ required: "Selecione o tipo de ocupação!" }}
 									render={({
 										field: { onChange, value, ref },
 										fieldState: { error },
@@ -1075,7 +1075,7 @@ export default function FundiaryInspectionForm() {
 								<Controller
 									control={control}
 									name="use_type_id"
-									rules={{ required: "Selecione o tipo de uso!" }}
+									// rules={{ required: "Selecione o tipo de uso!" }}
 									render={({
 										field: { onChange, value, ref },
 										fieldState: { error },
@@ -1103,9 +1103,11 @@ export default function FundiaryInspectionForm() {
 								<Controller
 									control={control}
 									name="environmental_influence_type_id"
-									rules={{
-										required: "Selecione o tipo de influência ambiental!",
-									}}
+									rules={
+										{
+											// required: "Selecione o tipo de influência ambiental!",
+										}
+									}
 									render={({
 										field: { onChange, value, ref },
 										fieldState: { error },
