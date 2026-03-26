@@ -6,6 +6,7 @@ export type FundiaryInspectionDTO = {
   requesterName: string
   requesterContact: string
   address: string
+  neighborhoods: string
   addressNumber: string
   lotNumber: string
   blockNumber: string

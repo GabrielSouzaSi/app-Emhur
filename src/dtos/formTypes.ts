@@ -4,7 +4,14 @@ export type ImageSourceMode = ImageSource | "both"
 
 export type SelectItem = { label: string; value: string }
 
-export type BaseField = { name: string; label: string; required?: boolean; colSpan?: 1 | 2 | 3 | 4 }
+export type BaseField = {
+    name: string
+    label: string
+    required?: boolean
+    colSpan?: 1 | 2 | 3 | 4
+    requiredMessage?: string
+    accuracy?: LocationAccuracyMode
+}
 
 export type LocationValue = {
     latitude: number
@@ -49,6 +56,9 @@ export type SelectField = BaseField & {
     type: "select"
     placeholder?: string
     options: SelectItem[]
+    searchable?: boolean
+    multiple?: boolean
+    searchPlaceholder?: string
 }
 
 export type ApiField = TextField | ImageField | SelectField | LocationField
