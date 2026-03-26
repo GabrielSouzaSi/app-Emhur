@@ -8,6 +8,33 @@ CREATE TABLE `driverTypes` (
 	`name` text
 );
 --> statement-breakpoint
+CREATE TABLE `form_entries` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`schema_id` text NOT NULL,
+	`schema_version` text,
+	`title` text,
+	`endpoint` text NOT NULL,
+	`data` text NOT NULL,
+	`error_message` text,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE `form_media` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`form_entry_id` integer NOT NULL,
+	`field_name` text NOT NULL,
+	`uri` text NOT NULL,
+	`name` text NOT NULL,
+	`type` text NOT NULL,
+	`created_at` text NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE `fundiaryEnvironmentalInfluenceType` (
+	`id` integer PRIMARY KEY NOT NULL,
+	`name` text
+);
+--> statement-breakpoint
 CREATE TABLE `fundiaryInspections` (
 	`id` integer PRIMARY KEY NOT NULL,
 	`service_order_number` text,
@@ -84,7 +111,7 @@ CREATE TABLE `violationsCode` (
 	`id` integer PRIMARY KEY NOT NULL,
 	`code` text,
 	`description` text,
-	`permit_types` text DEFAULT (json_array())
+	`permit_type_id` integer NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE `violations` (

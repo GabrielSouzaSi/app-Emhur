@@ -5,29 +5,22 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1772469150105,
-      "tag": "0000_grey_mole_man",
+      "when": 1773677716794,
+      "tag": "0000_cynical_alex_wilder",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "6",
-      "when": 1772514747122,
-      "tag": "0001_typical_fantastic_four",
+      "when": 1773752133918,
+      "tag": "0001_rich_starfox",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "6",
-      "when": 1772995468574,
-      "tag": "0002_furry_falcon",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1773031518810,
-      "tag": "0003_bitter_raza",
+      "when": 1773810366835,
+      "tag": "0002_stormy_storm",
       "breakpoints": true
     }
   ]
