@@ -1,6 +1,12 @@
 // utils/maskProcess.ts
-export function maskProcess(text: string) {
-    const digits = (text ?? "").replace(/\D/g, "")
+export function onlyProcessDigits(value: string) {
+    return (value ?? "").replace(/\D/g, "")
+}
+
+export function maskProcess(value: string) {
+    const digits = onlyProcessDigits(value)
+
+    if (!digits) return ""
 
     if (digits.length <= 4) {
         return digits
