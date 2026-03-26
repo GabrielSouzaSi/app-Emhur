@@ -61,12 +61,12 @@ export default function HomeFiscal() {
 			route: "/(auth)/frequency",
 			allow: can.hasTeam("DFT"),
 		},
-		{
-			title: "Create Form",
-			icon: "pencil-ruler",
-			route: "/(auth)/formBuilder",
-			allow: can.hasAnyTeam(["DFT", "GFF"]),
-		},
+		// {
+		// 	title: "Create Form",
+		// 	icon: "pencil-ruler",
+		// 	route: "/(auth)/formBuilder",
+		// 	allow: can.hasAnyTeam(["DFT", "GFF"]),
+		// },
 	]
 
 	// 2) filtra só o que pode ver

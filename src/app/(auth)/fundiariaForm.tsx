@@ -22,6 +22,7 @@ import { captureRef } from "react-native-view-shot"
 import { Button } from "@/components/button"
 import { DropdownButton } from "@/components/buttonDropdown"
 import { CameraSave } from "@/components/CameraSave"
+import { DropdownButton as RNDropdownButton } from "@/components/DropdownButton"
 import { GalleryPick } from "@/components/GalleryPick"
 import { HeaderBack } from "@/components/headerBack"
 import { Field } from "@/components/input"
@@ -36,6 +37,7 @@ import {
 } from "@/database/fundiaryInspections"
 import { getDatabaseFundiaryOccupationType } from "@/database/fundiaryOccupationType"
 import { getDatabaseFundiaryUseType } from "@/database/fundiaryUseType"
+import { getDatabaseNeighborhood } from "@/database/neighborhood"
 import { FundiaryInspectionDTO } from "@/dtos/FundiaryInspectionDTO"
 import { ImageDTO } from "@/dtos/imageDTO"
 import { server } from "@/server/api"
@@ -54,11 +56,13 @@ enum MODAL {
 
 type FundiaryInspectionForm = {
 	service_order_number: string
+	service_order_year: string
 	process_number: string
 	process_year: string
 	requester_name: string
 	requester_contact: string
 	address: string
+	neighborhood_id: string
 	address_number: string
 	lot_number: string
 	block_number: string
@@ -96,6 +100,8 @@ export default function FundiaryInspectionForm() {
 
 	const isEdit = !!inspectionId && !!selectedInspection
 
+	const [neighborhoods, setNeighborhoods] = useState<{ label: string; value: string }[]>([])
+
 	const [fundiaryOccupationType, setFundiaryOccupationType] = useState<
 		{ label: string; value: string }[]
 	>([])
@@ -132,10 +138,10 @@ export default function FundiaryInspectionForm() {
 		defaultValues: {
 			service_order_number: "",
 			process_number: "",
-			process_year: "",
 			requester_name: "",
 			requester_contact: "",
 			address: "",
+			neighborhood_id: "",
 			address_number: "",
 			lot_number: "",
 			block_number: "",
@@ -190,6 +196,19 @@ export default function FundiaryInspectionForm() {
 		}
 	}
 
+	async function getNeighborhoods() {
+		try {
+			const data = await getDatabaseNeighborhood()
+			const result = data.map((d: any) => ({
+				label: d.name,
+				value: String(d.id),
+			}))
+			setNeighborhoods(result)
+		} catch (error) {
+			console.log(error)
+		}
+	}
+
 	// ✅ Quando carregar selectedInspection, preencher o form + estados
 	useEffect(() => {
 		if (!selectedInspection) return
@@ -197,10 +216,10 @@ export default function FundiaryInspectionForm() {
 		reset({
 			service_order_number: selectedInspection.serviceOrderNumber ?? "",
 			process_number: selectedInspection.processNumber ?? "",
-			process_year: selectedInspection.processYear ?? "",
 			requester_name: selectedInspection.requesterName ?? "",
 			requester_contact: selectedInspection.requesterContact ?? "",
 			address: selectedInspection.address ?? "",
+			neighborhood_id: selectedInspection.neighborhoods ?? "",
 			address_number: selectedInspection.addressNumber ?? "",
 			lot_number: selectedInspection.lotNumber ?? "",
 			block_number: selectedInspection.blockNumber ?? "",
@@ -325,6 +344,7 @@ export default function FundiaryInspectionForm() {
 			requesterContact: data.requester_contact,
 
 			address: upper(data.address),
+			neighborhoods: data.neighborhood_id,
 			addressNumber: data.address_number,
 			lotNumber: data.lot_number,
 			blockNumber: data.block_number,
@@ -397,10 +417,12 @@ export default function FundiaryInspectionForm() {
 			requester_contact: data.requester_contact,
 
 			// trim simples nos demais
-			service_order_number: data.service_order_number?.trim() ?? "",
-			process_number: data.process_number?.trim() ?? "",
+			service_order_number: data.service_order_number?.split("/")[0].trim() ?? "",
+			service_order_year: data.service_order_number?.split("/")[1]?.trim() ?? "",
+			process_number: data.process_number?.split("/")[0].trim() ?? "",
 			process_year: data.process_number?.split("/")[1]?.trim() ?? "",
 			address_number: data.address_number?.trim() ?? "",
+			neighborhood_id: data.neighborhood_id?.trim() ?? "",
 			lot_number: data.lot_number?.trim() ?? "",
 			block_number: data.block_number?.trim() ?? "",
 			confrontation_right: data.confrontation_right?.trim() ?? "",
@@ -534,6 +556,7 @@ export default function FundiaryInspectionForm() {
 		getTableFundiaryUseType()
 		getTableFundiaryEnvironmentalInfluenceType()
 		getInspectionsFundiaryById()
+		getNeighborhoods()
 	}, [])
 
 	return (
@@ -718,10 +741,40 @@ export default function FundiaryInspectionForm() {
 											variant="primary"
 											returnKeyType="next"
 											submitBehavior="submit"
-											onSubmitEditing={() => setFocus("address_number")}
+											onSubmitEditing={() => setFocus("neighborhood_id")}
 											onChangeText={onChange}
 											value={value}
 											errorMessage={error?.message}
+										/>
+									)}
+								/>
+							</View>
+
+							{/* Bairro */}
+							<View className="mb-4">
+								<Text className="text-gray-500 font-regular text-2xl font-bold">
+									Selecione o Bairro:
+								</Text>
+								<Controller
+									control={control}
+									name="neighborhood_id"
+									rules={{ required: "Selecione o Bairro!" }}
+									render={({
+										field: { onChange, value, ref },
+										fieldState: { error },
+									}) => (
+										<RNDropdownButton
+											ref={ref}
+											data={neighborhoods}
+											placeholder="Bairro"
+											value={value}
+											searchable
+											errorMessage={error?.message}
+											onSelect={(selected) => {
+												if (Array.isArray(selected)) return
+												onChange(selected)
+												setFocus("address_number")
+											}}
 										/>
 									)}
 								/>

@@ -14,6 +14,7 @@ export const fundiaryInspections = sqliteTable("fundiaryInspections", {
   requesterContact: text("requester_contact"),
 
   address: text("address"),
+  neighborhoods: text("neighborhoods"),
   addressNumber: text("address_number"),
   lotNumber: text("lot_number"),
   blockNumber: text("block_number"),

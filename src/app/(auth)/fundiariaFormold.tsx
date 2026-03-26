@@ -2,7 +2,9 @@
 import { FormRenderer } from "@/components/FormRenderer"
 import { FormSchema } from "@/dtos/formTypes"
 import { submitOrStoreOffline } from "@/services/formEngineService"
+import { getOfflineEntryById } from "@/services/formOfflineService"
 import axios from "axios"
+import { useLocalSearchParams } from "expo-router"
 import { useEffect, useState } from "react"
 import {
 	ActivityIndicator,
@@ -15,44 +17,34 @@ import {
 } from "react-native"
 
 export default function FundiaryInspectionForm() {
+	const { entryId } = useLocalSearchParams()
+
 	const [schema, setSchema] = useState<FormSchema | null>(null)
+	const [initialValues, setInitialValues] = useState<Record<string, any> | null>(null)
+
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
-	// const schema = useMemo<FormSchema>(
-	// 	() => ({
-	// 		id: "fundiary_v1",
-	// 		title: "Atividade Fiscal",
-	// 		endpoint: "/fundiary-inspections",
-	// 		method: "POST",
-	// 		sections: [
-	// 			{
-	// 				id: "process_info",
-	// 				title: "Identificação do Processo",
-	// 				layout: [["process_number", "service_order_number"]],
-	// 				fields: [
-	// 					{
-	// 						name: "process_number",
-	// 						label: "Número do Processo",
-	// 						type: "process",
-	// 						placeholder: "ex.: 123/2026",
-	// 						required: true,
-	// 						minLength: 4,
-	// 					}
-	// 				],
-	// 			},
 
 	useEffect(() => {
-		async function loadSchema() {
+		async function loadData() {
 			try {
 				setLoading(true)
-				setError(null)
 
+				// carregar schema
 				const response = await axios.get<FormSchema>(
-					"http://192.168.1.32:3333/form-schemas/fundiary_v3",
+					"http://192.168.1.32:3333/form-schemas/fundiary_v1",
 				)
-				//console.log("schema:", JSON.stringify(response.data, null, 2))
 
 				setSchema(response.data)
+
+				// carregar pendência se existir
+				if (entryId) {
+					const entry = await getOfflineEntryById(Number(entryId))
+
+					if (entry) {
+						setInitialValues(JSON.parse(entry.data))
+					}
+				}
 			} catch (err: any) {
 				setError(err?.message ?? "Erro ao carregar formulário.")
 			} finally {
@@ -60,8 +52,8 @@ export default function FundiaryInspectionForm() {
 			}
 		}
 
-		loadSchema()
-	}, [])
+		loadData()
+	}, [entryId])
 
 	return (
 		<KeyboardAvoidingView
@@ -85,10 +77,13 @@ export default function FundiaryInspectionForm() {
 				) : schema ? (
 					<FormRenderer
 						schema={schema}
+						initialValues={initialValues ?? undefined}
 						onSubmit={async (values) => {
-							//console.log(values)
-
-							const result = await submitOrStoreOffline(schema, values)
+							const result = await submitOrStoreOffline(
+								schema,
+								values,
+								entryId ? Number(entryId) : undefined,
+							)
 
 							if (result.mode === "online") {
 								Alert.alert("Sucesso", "Formulário enviado com sucesso.")
@@ -99,7 +94,6 @@ export default function FundiaryInspectionForm() {
 								"Sem envio online",
 								`Não foi possível enviar agora. O formulário foi salvo offline.\n\nErro: ${result.errorMessage}`,
 							)
-							console.log(result.errorMessage)
 						}}
 					/>
 				) : (

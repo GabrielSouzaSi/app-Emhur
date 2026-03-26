@@ -15,6 +15,8 @@ import * as fundiaryUseTypeSchema from "@/database/schemas/fundiaryUseTypeSchema
 import * as formEntriesSchema from "@/database/schemas/formEntriesSchema";
 import * as formMediaSchema from "@/database/schemas/formMediaSchema";
 
+import * as neighborhoodSchema from "@/database/schemas/neighborhoodSchema";
+
 import { drizzle } from "drizzle-orm/expo-sqlite";
 import * as SQLite from "expo-sqlite";
 import * as permitType from "./schemas/permitTypeSchema";
@@ -42,5 +44,7 @@ export const db = drizzle(expoDb, {
 
         ...formEntriesSchema,
         ...formMediaSchema,
+
+        ...neighborhoodSchema
     }
 });

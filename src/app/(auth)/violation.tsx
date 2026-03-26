@@ -69,6 +69,13 @@ type FormData = {
 	infracoes: number[]
 }
 
+export type ViolationCode = {
+	id: number
+	code: string
+	description: string
+	permitTypeId: number
+}
+
 export default function Autuacaoes() {
 	const ref = useRef<any>(null)
 	const { width, height } = Dimensions.get("window")
@@ -179,11 +186,13 @@ export default function Autuacaoes() {
 		}
 	}
 	// Função para trazer os dados da tabela infracoes
-	async function getViolationCode(type?: string | number) {
+	async function getViolationCode(permitTypeId: number) {
 		try {
 			const response = await getDatabaseViolationCode()
 
-			const filtered = response.filter((v: any) => v.permitTypes.some((p) => p.id == type))
+			const filtered = response.filter(
+				(item: ViolationCode) => item.permitTypeId === permitTypeId,
+			)
 
 			let cod = await filtered.map((item: any) => {
 				return {
@@ -287,7 +296,7 @@ export default function Autuacaoes() {
 			formData.append("driver_type_id", `${driverTypeId}`)
 			formData.append(
 				"driver_name",
-				`${driverName === "" ? "Nome Não Informado" : driverName}`
+				`${driverName === "" ? "Nome Não Informado" : driverName}`,
 			)
 			formData.append("driver_cpf", `${driverCpf === "" ? "CPF Não Informado" : driverCpf}`)
 			formData.append("driver_cnh", `${driverCnh === "" ? "CNH Não Informado" : driverCnh}`)
@@ -297,7 +306,7 @@ export default function Autuacaoes() {
 				"description",
 				`${refused ? "O condutor se recusou a assinar o auto de infração. " : ""}${
 					obs || refused ? obs : "Sem observações"
-				}`
+				}`,
 			)
 			imagens.forEach((image: ImageDTO) => {
 				formData.append("attachments[]", {
@@ -396,7 +405,7 @@ export default function Autuacaoes() {
 			const lower = text.toLowerCase()
 
 			const filtered = codigo.filter((item: ListCod) =>
-				item.description.toLowerCase().includes(lower)
+				item.description.toLowerCase().includes(lower),
 			)
 
 			if (filtered.length === 0) {
@@ -406,12 +415,12 @@ export default function Autuacaoes() {
 
 			setSelecText(filtered)
 		}, 250),
-		[codigo]
+		[codigo],
 	)
 
 	// Função para pegar o tipo de alvará selecionado
 	const onSelectPermitType = (item: string) => {
-		getViolationCode(item)
+		getViolationCode(Number(item))
 	}
 	// Função para preparar o componente RadioButton
 	const onSelectMode = (item: any) => {
@@ -459,7 +468,7 @@ export default function Autuacaoes() {
 				</TouchableOpacity>
 			)
 		},
-		[idInfracao] // só re-render se mudar a seleção
+		[idInfracao], // só re-render se mudar a seleção
 	)
 
 	// Função recebe o código da infração selecionada
