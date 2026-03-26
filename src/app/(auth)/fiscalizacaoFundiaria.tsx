@@ -1,11 +1,12 @@
 import * as FileSystem from "expo-file-system/legacy"
 import { useFocusEffect, useRouter } from "expo-router"
-import { useCallback, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Alert, ScrollView, Text, View } from "react-native"
 import Share from "react-native-share"
 
 import { Button } from "@/components/button"
 import DataTableOffFundiary from "@/components/dataTableOffFundiary"
+import FundiaryCardOffline from "@/components/FundiaryCardOffline"
 import { HeaderBack } from "@/components/headerBack"
 import { LoadingLight } from "@/components/loading"
 import { Modal } from "@/components/RNModal"
@@ -15,6 +16,7 @@ import {
 } from "@/database/fundiaryInspections"
 import { FundiaryInspectionDTO } from "@/dtos/FundiaryInspectionDTO"
 import { server } from "@/server/api"
+import { getOfflineEntryAll } from "@/services/formOfflineService"
 import Toast from "react-native-toast-message"
 
 enum MODAL {
@@ -28,6 +30,7 @@ export default function HistoricoFiscalizacaoFundiaria() {
 	const [inspectionsFundiary, setInspectionsFundiary] = useState([])
 	const [selectedInspection, setSelectedInspection] = useState<FundiaryInspectionDTO | null>(null)
 	const [rawJson, setRawJson] = useState<string | null>(null)
+	const [cardForm, setCardForm] = useState<any[]>([])
 
 	const router = useRouter()
 
@@ -39,11 +42,12 @@ export default function HistoricoFiscalizacaoFundiaria() {
 	function buildRawPayload(item: FundiaryInspectionDTO) {
 		return {
 			service_order_number: item.serviceOrderNumber ?? "",
-			process_number: item.processNumber ?? "",
-			process_year: item.processYear ?? "",
+			process_number: item.processNumber.split("/")[0] ?? "",
+			process_year: item.processNumber.split("/")[1] ?? "",
 			requester_name: item.requesterName ?? "",
 			requester_contact: item.requesterContact ?? "",
 			address: item.address ?? "",
+			neighborhood_id: item.neighborhoods ?? "",
 			address_number: item.addressNumber ?? "",
 			lot_number: item.lotNumber ?? "",
 			block_number: item.blockNumber ?? "",
@@ -76,11 +80,13 @@ export default function HistoricoFiscalizacaoFundiaria() {
 FISCALIZAÇÃO FUNDIÁRIA
 
 Ordem de Serviço: ${item.serviceOrderNumber || "-"}
+Ano da Ordem de Serviço: ${item.serviceOrderNumber.split("/")[1] || "-"}
 Processo: ${item.processNumber || "-"}
 Ano do Processo: ${item.processYear || "-"}
 Requerente: ${item.requesterName || "-"}
 Contato: ${item.requesterContact || "-"}
 Endereço: ${item.address || "-"}
+Bairro: ${item.neighborhoods || "-"}
 Número: ${item.addressNumber || "-"}
 Lote: ${item.lotNumber || "-"}
 Quadra: ${item.blockNumber || "-"}
@@ -214,12 +220,20 @@ ${item.observations || "Sem observações"}
 		try {
 			const formData = new FormData()
 
-			formData.append("service_order_number", selectedInspection.serviceOrderNumber ?? "")
-			formData.append("process_number", selectedInspection.processNumber ?? "")
-			formData.append("process_year", selectedInspection.processYear ?? "")
+			formData.append(
+				"service_order_number",
+				selectedInspection.serviceOrderNumber.split("/")[0] ?? "",
+			)
+			formData.append(
+				"service_order_year",
+				selectedInspection.serviceOrderNumber.split("/")[1] ?? "",
+			)
+			formData.append("process_number", selectedInspection.processNumber.split("/")[0] ?? "")
+			formData.append("process_year", selectedInspection.processNumber.split("/")[1] ?? "")
 			formData.append("requester_name", selectedInspection.requesterName ?? "")
 			formData.append("requester_contact", selectedInspection.requesterContact ?? "")
 			formData.append("address", selectedInspection.address ?? "")
+			formData.append("neighborhood_id", selectedInspection.neighborhoods ?? "")
 			formData.append("address_number", selectedInspection.addressNumber ?? "")
 			formData.append("lot_number", selectedInspection.lotNumber ?? "")
 			formData.append("block_number", selectedInspection.blockNumber ?? "")
@@ -346,6 +360,32 @@ ${item.observations || "Sem observações"}
 		}, []),
 	)
 
+	useEffect(() => {
+		async function load() {
+			const entryAll = await getOfflineEntryAll()
+
+			if (entryAll.length === 0) {
+				return
+			}
+
+			const data = entryAll.map((entry) => {
+				return {
+					id: entry.id,
+					title: entry.title,
+					schemaId: entry.schemaId,
+					updatedAt: entry.updatedAt,
+					errorMessage: entry.errorMessage,
+					data: JSON.parse(entry.data),
+				}
+			})
+
+			// console.log(JSON.stringify(data, null, 2))
+			setCardForm(data)
+		}
+
+		load()
+	}, [])
+
 	return (
 		<View className="flex-1">
 			<HeaderBack title="Histórico" variant="primary" />
@@ -377,8 +417,10 @@ ${item.observations || "Sem observações"}
 				</View>
 			)}
 
-			<View className="m-4">
-				<Button variant="primary" onPress={() => router.push("/(auth)/fundiariaFormold")}>
+			{cardForm.length > 0 && <FundiaryCardOffline data={cardForm} />}
+
+			<View className="absolute bottom-1 w-full p-4 flex-row justify-center">
+				<Button variant="primary" onPress={() => router.push("/(auth)/fundiariaForm")}>
 					<Button.TextButton title="Formulário" />
 				</Button>
 			</View>

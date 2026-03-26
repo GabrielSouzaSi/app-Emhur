@@ -2,6 +2,7 @@
 import * as Haptics from "expo-haptics"
 import * as Location from "expo-location"
 import React, { useEffect, useState } from "react"
+import { useController, type Control } from "react-hook-form"
 import {
 	Alert,
 	FlatList,
@@ -18,14 +19,14 @@ import { SafeAreaView } from "react-native-safe-area-context"
 import { CameraSave } from "@/components/CameraSave"
 import { GalleryPick } from "@/components/GalleryPick"
 import { Field } from "@/components/input"
+import type { ApiField, ImageField, LocationAccuracyMode } from "@/dtos/formTypes"
+import type { ImageDTO } from "@/dtos/imageDTO"
 import { maskCNPJ, maskCPF, maskCpfCnpj } from "@/utils/cpfCnpj"
+import { buildFieldRules } from "@/utils/formValidation"
+import { maskPhone } from "@/utils/maskPhone"
 import { maskProcess } from "@/utils/maskProcess"
 import { Button } from "./button"
-import { DropdownButton } from "./buttonDropdown"
-
-import type { ApiField, ImageField } from "@/dtos/formTypes"
-import type { ImageDTO } from "@/dtos/imageDTO"
-import { maskPhone } from "@/utils/maskPhone"
+import { DropdownButton } from "./DropdownButton"
 
 type FocusableRef =
 	| {
@@ -37,26 +38,42 @@ type FocusableRef =
 
 type Props = {
 	field: ApiField
-	value: any
-	error?: string
-	onChange: (name: string, value: any) => void
-
+	control: Control<Record<string, any>>
 	inputRef?: (ref: FocusableRef) => void
 	onSubmitEditing?: () => void
 	returnKeyType?: ReturnKeyTypeOptions
 	isLastField?: boolean
 }
 
+function resolveLocationAccuracy(mode?: LocationAccuracyMode) {
+	switch (mode) {
+		case "best":
+			return Location.Accuracy.BestForNavigation
+		case "high":
+			return Location.Accuracy.High
+		case "balanced":
+		default:
+			return Location.Accuracy.Balanced
+	}
+}
+
 function FieldRendererComponent({
 	field,
-	value,
-	error,
-	onChange,
+	control,
 	inputRef,
 	onSubmitEditing,
 	returnKeyType,
 	isLastField,
 }: Props) {
+	const {
+		field: rhfField,
+		fieldState: { error },
+	} = useController({
+		control,
+		name: field.name,
+		rules: buildFieldRules(field),
+	})
+
 	const [viewerOpen, setViewerOpen] = useState(false)
 	const [selectedImageIndex, setSelectedImageIndex] = useState(0)
 
@@ -64,19 +81,27 @@ function FieldRendererComponent({
 		case "select": {
 			return (
 				<View className="mb-4">
-					{field.label === "" || field.label === null ? null : (
+					{field.label ? (
 						<Text className="text-gray-700 font-bold mb-2">{field.label}</Text>
-					)}
+					) : null}
 
 					<DropdownButton
-						ref={inputRef as any}
+						ref={(instance) => {
+							rhfField.ref(instance)
+							inputRef?.(instance)
+						}}
 						data={field.options}
 						placeholder={field.placeholder ?? "Selecione uma opção"}
-						errorMessage={error}
-						value={value ?? null}
-						onSelect={(item) => {
-							onChange(field.name, item.value)
-							if (!isLastField) {
+						errorMessage={error?.message}
+						value={rhfField.value ?? (field.multiple ? [] : null)}
+						searchable={field.searchable}
+						multiple={field.multiple}
+						searchPlaceholder={field.searchPlaceholder}
+						onSelect={(selectedValue) => {
+							rhfField.onChange(selectedValue)
+							rhfField.onBlur()
+
+							if (!field.multiple && !isLastField) {
 								setTimeout(() => {
 									onSubmitEditing?.()
 								}, 150)
@@ -86,10 +111,14 @@ function FieldRendererComponent({
 				</View>
 			)
 		}
-
 		case "image": {
 			const f: ImageField = field
-			const images = Array.isArray(value) ? value : value ? [value] : []
+			const images = Array.isArray(rhfField.value)
+				? rhfField.value
+				: rhfField.value
+					? [rhfField.value]
+					: []
+
 			const total = images.length
 
 			function addImage(input: ImageDTO | ImageDTO[]) {
@@ -97,15 +126,16 @@ function FieldRendererComponent({
 
 				if (f.multiple) {
 					const merged = [...images, ...newImages]
-
 					const unique = merged.filter(
 						(img, index, arr) => arr.findIndex((x) => x.uri === img.uri) === index,
 					)
 
-					onChange(f.name, unique)
+					rhfField.onChange(unique)
 				} else {
-					onChange(f.name, newImages[0] ?? null)
+					rhfField.onChange(newImages[0] ?? null)
 				}
+
+				rhfField.onBlur()
 			}
 
 			function removeImage(index: number) {
@@ -118,10 +148,12 @@ function FieldRendererComponent({
 							const next = images.filter((_: ImageDTO, i: number) => i !== index)
 
 							if (f.multiple) {
-								onChange(f.name, next)
+								rhfField.onChange(next)
 							} else {
-								onChange(f.name, null)
+								rhfField.onChange(null)
 							}
+
+							rhfField.onBlur()
 
 							if (selectedImageIndex >= next.length) {
 								setSelectedImageIndex(Math.max(0, next.length - 1))
@@ -156,13 +188,13 @@ function FieldRendererComponent({
 								<CameraSave onChange={addImage} />
 							</View>
 							<View className="flex-1 ml-2">
-								<GalleryPick onChange={addImage} multiple={f.multiple} />
+								<GalleryPick onChange={addImage as any} multiple={!!f.multiple} />
 							</View>
 						</View>
 					) : showCamera ? (
 						<CameraSave onChange={addImage} />
 					) : (
-						<GalleryPick onChange={addImage} multiple={f.multiple} />
+						<GalleryPick onChange={addImage as any} multiple={!!f.multiple} />
 					)}
 
 					{total > 0 ? (
@@ -220,10 +252,7 @@ function FieldRendererComponent({
 									<>
 										<Image
 											source={{ uri: selectedImage.uri }}
-											style={{
-												width: "100%",
-												height: "75%",
-											}}
+											style={{ width: "100%", height: "75%" }}
 											resizeMode="contain"
 										/>
 
@@ -280,12 +309,82 @@ function FieldRendererComponent({
 						</SafeAreaView>
 					</Modal>
 
-					{error ? <Text className="text-red-500 mt-1 ml-1">{error}</Text> : null}
+					{error?.message ? (
+						<Text className="text-red-500 mt-1 ml-1">{error.message}</Text>
+					) : null}
 				</View>
 			)
 		}
 
-		// ✅ TEXTO / NUMBER / ETC
+		case "location": {
+			async function getGPS() {
+				try {
+					const { status } = await Location.requestForegroundPermissionsAsync()
+
+					if (status !== "granted") {
+						Alert.alert("Permissão necessária", "Permita o acesso à localização.")
+						return
+					}
+
+					const location = await Location.getCurrentPositionAsync({
+						accuracy: resolveLocationAccuracy(field.accuracy),
+					})
+
+					rhfField.onChange({
+						latitude: location.coords.latitude,
+						longitude: location.coords.longitude,
+						accuracy: location.coords.accuracy,
+					})
+					rhfField.onBlur()
+				} catch (err) {
+					console.log(err)
+					Alert.alert("Erro", "Não foi possível obter a localização.")
+				}
+			}
+
+			return (
+				<View className="mb-4">
+					<Text className="text-gray-700 font-bold mb-2">{field.label}</Text>
+
+					<Pressable
+						className="mb-2 w-full items-center justify-center p-4 rounded-md bg-blue-500 active:opacity-60"
+						onLongPress={() => {
+							getGPS()
+							Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
+						}}
+					>
+						<Button.TextButton title={field.buttonLabel ?? "Marcar posição"} />
+					</Pressable>
+
+					{error?.message ? (
+						<Text className="text-red-500 mb-4">{error.message}</Text>
+					) : null}
+
+					{rhfField.value ? (
+						<View className="flex-row justify-between gap-4 mb-4">
+							<View className="flex-1">
+								<Text className="text-gray-500 font-bold">Latitude</Text>
+								<Field
+									variant="primary"
+									value={String(rhfField.value.latitude)}
+									editable={false}
+								/>
+							</View>
+
+							<View className="flex-1">
+								<Text className="text-gray-500 font-bold">Longitude</Text>
+								<Field
+									variant="primary"
+									value={String(rhfField.value.longitude)}
+									editable={false}
+								/>
+							</View>
+						</View>
+					) : null}
+				</View>
+			)
+		}
+
 		case "cpf":
 		case "cnpj":
 		case "cpf_cnpj":
@@ -314,10 +413,8 @@ function FieldRendererComponent({
 							? "email-address"
 							: "default"
 
-			const shouldTrim = ["text", "textarea", "email", "password"].includes(field.type)
-
 			const displayValue = (() => {
-				const v = String(value ?? "")
+				const v = String(rhfField.value ?? "")
 				if (field.type === "cpf") return maskCPF(v)
 				if (field.type === "cnpj") return maskCNPJ(v)
 				if (field.type === "cpf_cnpj") return maskCpfCnpj(v)
@@ -328,129 +425,64 @@ function FieldRendererComponent({
 
 			return (
 				<View className="mb-4">
-					{field.label === "" || field.label === null ? null : (
+					{field.label ? (
 						<Text className="text-gray-700 font-bold mb-2">{field.label}</Text>
-					)}
+					) : null}
 
 					<Field
-						ref={inputRef as any}
+						ref={(instance) => {
+							rhfField.ref(instance)
+							inputRef?.(instance)
+						}}
 						value={displayValue}
 						placeholder={field.placeholder}
 						multiline={isTextArea}
 						keyboardType={keyboardType}
 						secureTextEntry={field.type === "password"}
-						errorMessage={error}
+						errorMessage={error?.message}
 						returnKeyType={returnKeyType}
 						submitBehavior={isTextArea ? "newline" : "submit"}
 						onSubmitEditing={() => {
-							if (!isTextArea) {
-								onSubmitEditing?.()
-							}
+							if (!isTextArea) onSubmitEditing?.()
 						}}
 						onBlur={() => {
-							if (shouldTrim) {
-								onChange(field.name, String(value ?? "").trim())
+							const current = rhfField.value
+
+							if (
+								field.type === "text" ||
+								field.type === "textarea" ||
+								field.type === "email" ||
+								field.type === "password"
+							) {
+								rhfField.onChange(String(current ?? "").trim())
 							}
+
+							rhfField.onBlur()
 						}}
 						onChangeText={(text) => {
 							if (field.type === "number") {
-								const cleaned = text.replace(/[^\d.,]/g, "")
-								onChange(field.name, cleaned)
+								rhfField.onChange(text.replace(/[^\d.,-]/g, ""))
 								return
 							}
 
 							if (field.type === "process") {
-								onChange(field.name, maskProcess(text))
-								return
-							}
-
-							if (field.type === "phone") {
-								onChange(field.name, text.replace(/\D/g, ""))
+								rhfField.onChange(maskProcess(text))
 								return
 							}
 
 							if (
+								field.type === "phone" ||
 								field.type === "cpf" ||
 								field.type === "cnpj" ||
 								field.type === "cpf_cnpj"
 							) {
-								onChange(field.name, text.replace(/\D/g, ""))
+								rhfField.onChange(text.replace(/\D/g, ""))
 								return
 							}
 
-							onChange(field.name, text)
+							rhfField.onChange(text)
 						}}
 					/>
-				</View>
-			)
-		}
-		case "location": {
-			async function getGPS() {
-				try {
-					const { status } = await Location.requestForegroundPermissionsAsync()
-
-					if (status !== "granted") {
-						Alert.alert("Permissão necessária", "Permita o acesso à localização.")
-						return
-					}
-
-					const location = await Location.getCurrentPositionAsync({
-						accuracy: Location.Accuracy.High,
-					})
-
-					onChange(field.name, {
-						latitude: location.coords.latitude,
-						longitude: location.coords.longitude,
-						accuracy: location.coords.accuracy,
-					})
-				} catch (error) {
-					console.log(error)
-				}
-			}
-
-			return (
-				<View>
-					<Text className="text-gray-700 font-bold mb-2">{field.label}</Text>
-
-					<Pressable
-						className="mb-2 w-full items-center justify-center p-4 rounded-md bg-blue-500 active:opacity-60"
-						onLongPress={() => {
-							getGPS()
-							Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
-						}}
-					>
-						<Button.TextButton title={field.buttonLabel ?? "Marcar posição"} />
-					</Pressable>
-
-					{error && <Text className="text-red-500 mb-4">{error}</Text>}
-
-					{value && (
-						<View className="flex-row justify-between gap-4 mb-4">
-							{/* Latitude */}
-							<View className="flex-1">
-								<Text className="text-gray-500 font-regular font-bold">
-									Latitude
-								</Text>
-								<Field
-									variant="primary"
-									value={String(value.latitude)}
-									editable={false}
-								/>
-							</View>
-							{/* Longitude */}
-							<View className="flex-1">
-								<Text className="text-gray-500 font-regular font-bold">
-									Longitude
-								</Text>
-								<Field
-									className="text-gray-500"
-									variant="primary"
-									value={String(value.longitude)}
-									editable={false}
-								/>
-							</View>
-						</View>
-					)}
 				</View>
 			)
 		}

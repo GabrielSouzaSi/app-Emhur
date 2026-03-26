@@ -1,7 +1,7 @@
 // src/components/buttonDropdown.tsx
 import { Ionicons } from "@expo/vector-icons"
 import clsx from "clsx"
-import { forwardRef, useEffect, useImperativeHandle, useState } from "react"
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react"
 import { FlatList, Text, TouchableOpacity, View } from "react-native"
 
 type Item = {
@@ -12,6 +12,8 @@ type Item = {
 export type DropdownButtonRef = {
 	focus: () => void
 	blur: () => void
+	open: () => void
+	close: () => void
 }
 
 type DropdownButtonProps = {
@@ -20,27 +22,40 @@ type DropdownButtonProps = {
 	placeholder?: string
 	errorMessage?: string
 	value?: string | number | null
+	disabled?: boolean
 }
 
 const DropdownButton = forwardRef<DropdownButtonRef, DropdownButtonProps>(
-	({ data, onSelect, placeholder = "Selecione uma opção", errorMessage, value }, ref) => {
-		const [selectedValue, setSelectedLabel] = useState<string | null>(null)
+	(
+		{ data, onSelect, placeholder = "Selecione uma opção", errorMessage, value, disabled },
+		ref,
+	) => {
 		const [isDropdownVisible, setIsDropdownVisible] = useState(false)
 
-		useEffect(() => {
-			if (value != null) {
-				const selectedItem = data.find((item) => item.value === value)
-				setSelectedLabel(selectedItem ? selectedItem.label : null)
-			}
+		const selectedLabel = useMemo(() => {
+			if (value == null) return null
+			const found = data.find((item) => String(item.value) === String(value))
+			return found?.label ?? null
 		}, [value, data])
 
+		useEffect(() => {
+			if (disabled) {
+				setIsDropdownVisible(false)
+			}
+		}, [disabled])
+
 		useImperativeHandle(ref, () => ({
-			focus: () => setIsDropdownVisible(true),
+			focus: () => {
+				if (!disabled) setIsDropdownVisible(true)
+			},
 			blur: () => setIsDropdownVisible(false),
+			open: () => {
+				if (!disabled) setIsDropdownVisible(true)
+			},
+			close: () => setIsDropdownVisible(false),
 		}))
 
 		const handleSelect = (item: Item) => {
-			setSelectedLabel(item.label)
 			onSelect(item)
 			setIsDropdownVisible(false)
 		}
@@ -48,15 +63,17 @@ const DropdownButton = forwardRef<DropdownButtonRef, DropdownButtonProps>(
 		return (
 			<View>
 				<TouchableOpacity
+					disabled={disabled}
 					className={clsx(
-						"flex-row justify-between items-center h-16 border-gray-400 border-2 bg-white rounded-md px-4",
+						"flex-row justify-between items-center h-16 border-2 bg-white rounded-md px-4",
 						{ "border-gray-400": !errorMessage },
-						{ "border-red-400": errorMessage },
+						{ "border-red-400": !!errorMessage },
+						{ "opacity-60": disabled },
 					)}
 					onPress={() => setIsDropdownVisible((prev) => !prev)}
 				>
-					<Text className="font-semiBold text-lg">
-						{selectedValue ? selectedValue : placeholder}
+					<Text className="font-semiBold text-lg text-gray-700">
+						{selectedLabel ?? placeholder}
 					</Text>
 
 					<Ionicons
@@ -66,13 +83,15 @@ const DropdownButton = forwardRef<DropdownButtonRef, DropdownButtonProps>(
 					/>
 				</TouchableOpacity>
 
-				{errorMessage && <Text className="text-red-500 mt-1 ml-1">{errorMessage}</Text>}
+				{errorMessage ? (
+					<Text className="text-red-500 mt-1 ml-1">{errorMessage}</Text>
+				) : null}
 
-				{isDropdownVisible && (
+				{isDropdownVisible ? (
 					<View className="mt-4 bg-white rounded-md p-2 border-2 border-gray-300 mb-4">
 						<FlatList
 							data={data}
-							keyExtractor={(item) => item.value}
+							keyExtractor={(item) => String(item.value)}
 							renderItem={({ item }) => (
 								<TouchableOpacity
 									className="bg-blue-500 rounded-md p-2 my-2"
@@ -88,7 +107,7 @@ const DropdownButton = forwardRef<DropdownButtonRef, DropdownButtonProps>(
 							showsVerticalScrollIndicator={false}
 						/>
 					</View>
-				)}
+				) : null}
 			</View>
 		)
 	},

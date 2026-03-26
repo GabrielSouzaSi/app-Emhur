@@ -14,25 +14,14 @@ type OfflineEntryParams = {
     errorMessage?: string | null
 }
 
+const FORCE_OFFLINE_IN_DEV = true
+
 export async function submitFormOnline(schema: FormSchema, values: Record<string, any>) {
     const formData = buildFormDataFromSchema(schema, values)
-    console.log("buildFormDataFromSchema => " + JSON.stringify(formData, null, 2));
-
-    // const response = await axios({
-    //     url: schema.endpoint,
-    //     method: "POST",
-    //     data: formData,
-    //     headers: {
-    //         "Content-Type": "multipart/form-data"
-    //     },
-    // })
-
-    //console.log("response => " + response);
-
-    const response = server.postForm("/fundiary-inspections", formData)
-
-
-    // return response.data
+    const response = await server.postForm(schema.endpoint, formData)
+    if (__DEV__ && FORCE_OFFLINE_IN_DEV) {
+        throw new Error("Simulação de modo offline para testes")
+    }
     return response
 }
 
@@ -43,6 +32,8 @@ export async function saveOfflineEntry({
     errorMessage,
 }: OfflineEntryParams) {
     const now = new Date().toISOString()
+
+    console.log("saveOfflineEntry:start", { entryId, schemaId: schema.id })
 
     const baseData = {
         schemaId: schema.id,
@@ -67,6 +58,7 @@ export async function saveOfflineEntry({
 
     const insertedId = Number(result.lastInsertRowId)
     await replaceMedia(insertedId, schema, values)
+
     return insertedId
 }
 
@@ -77,12 +69,7 @@ export async function submitOrStoreOffline(
 ) {
     try {
         const response = await submitFormOnline(schema, values)
-        //console.log(response);
-        console.log("submitFormOnline: ", JSON.stringify(response, null, 2));
 
-
-        // ✅ sucesso: não persiste localmente
-        // se veio de uma pendência offline, remove ela
         if (entryId) {
             try {
                 await deleteOfflineEntry(entryId)
@@ -131,7 +118,7 @@ async function replaceMedia(
     const { files } = extractPayloadAndFiles(schema, values)
     const now = new Date().toISOString()
 
-    if (files.length === 0) return
+    if (!files.length) return
 
     await db.insert(formMedia).values(
         files.map((item) => ({
