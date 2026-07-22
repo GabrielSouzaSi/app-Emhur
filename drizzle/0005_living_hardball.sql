@@ -1,0 +1,1 @@
+ALTER TABLE `form_entries` ADD `type_form_id` integer NOT NULL;

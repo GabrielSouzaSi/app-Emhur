@@ -22,6 +22,34 @@
       "when": 1773810366835,
       "tag": "0002_stormy_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1776101515698,
+      "tag": "0003_unusual_moonstone",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1776186705432,
+      "tag": "0004_dashing_microbe",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1776193126616,
+      "tag": "0005_living_hardball",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1783275896825,
+      "tag": "0006_spooky_longshot",
+      "breakpoints": true
     }
   ]
 }
