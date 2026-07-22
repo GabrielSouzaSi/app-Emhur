@@ -4,8 +4,12 @@ import { FlatList, Text, View } from "react-native"
 
 import { HeaderMenu } from "@/components/headerMenu"
 import { MenuCard } from "@/components/menuCard"
+import { UpdateAppModal } from "@/components/UpdateAppModal"
 import { useAuth } from "@/hooks/useAuth"
+import { checkUpdate, UpdateInfo } from "@/utils/checkUpdate"
 import { update } from "@/utils/configDataApp"
+import { useState } from "react"
+import Toast from "react-native-toast-message"
 
 type MenuItemBase = {
 	title: string
@@ -53,7 +57,7 @@ export default function HomeFiscal() {
 			title: "Fisc. Fundiária",
 			icon: "home-outline",
 			route: "/(auth)/fiscalizacaoFundiaria",
-			allow: can.hasTeam("GFF"),
+			allow: can.hasAnyTeam(["GFF", "FF"]),
 		},
 		{
 			title: "Frequência",
@@ -71,6 +75,55 @@ export default function HomeFiscal() {
 
 	// 2) filtra só o que pode ver
 	const allowedMenu = menuItems.filter((item) => item.allow !== false)
+
+	const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
+	const [modalVisible, setModalVisible] = useState(false)
+	const [isCheckingUpdate, setIsCheckingUpdate] = useState(false)
+
+	async function handleCheckUpdate() {
+		if (isCheckingUpdate) return
+
+		try {
+			setIsCheckingUpdate(true)
+
+			Toast.show({
+				type: "info",
+				text1: "Verificando atualizações...",
+			})
+
+			const result = await checkUpdate()
+
+			if (!result) {
+				Toast.show({
+					type: "error",
+					text1: "Não foi possível verificar atualizações.",
+					text2: "Verifique sua conexão e tente novamente.",
+				})
+				return
+			}
+
+			if (result.hasUpdate) {
+				setUpdateInfo(result)
+				setModalVisible(true)
+				return
+			}
+
+			Toast.show({
+				type: "success",
+				text1: "Seu aplicativo está atualizado.",
+				text2: `Versão instalada: ${result.currentVersion}`,
+			})
+		} catch (error) {
+			console.error("Erro ao verificar atualização:", error)
+
+			Toast.show({
+				type: "error",
+				text1: "Erro ao verificar atualização.",
+			})
+		} finally {
+			setIsCheckingUpdate(false)
+		}
+	}
 
 	function isMenuItemBase(item: MenuItem): item is MenuItemBase {
 		return !("empty" in item)
@@ -90,7 +143,7 @@ export default function HomeFiscal() {
 
 	return (
 		<View className="flex-1">
-			<HeaderMenu onUpdate={update} />
+			<HeaderMenu onUpdate={update} onCheckUpdate={handleCheckUpdate} />
 
 			<FlatList
 				data={fillMenu(allowedMenu)}
@@ -115,7 +168,19 @@ export default function HomeFiscal() {
 				}
 			/>
 
-			<Text className="absolute bottom-2 left-4 text-sm text-gray-500">{`V.: ${versao}`}</Text>
+			<Text className="absolute bottom-2 left-4 text-base text-gray-500">{`V.: ${versao}`}</Text>
+
+			{updateInfo && (
+				<UpdateAppModal
+					visible={modalVisible}
+					version={updateInfo.latestVersion}
+					message={updateInfo.message}
+					releaseNotes={updateInfo.releaseNotes}
+					storeUrl={updateInfo.storeUrl}
+					required={updateInfo.required}
+					onClose={() => setModalVisible(false)}
+				/>
+			)}
 		</View>
 	)
 }

@@ -8,10 +8,11 @@ import styles from "@/styles/shadow"
 import { FontAwesome6 } from "@expo/vector-icons"
 
 type HeaderMenuProps = {
-	onUpdate: () => void
+	onUpdate: () => void | Promise<void>
+	onCheckUpdate: () => void | Promise<void>
 }
 
-export function HeaderMenu({ onUpdate }: HeaderMenuProps) {
+export function HeaderMenu({ onUpdate, onCheckUpdate }: HeaderMenuProps) {
 	const router = useRouter()
 	const [isDropdownVisible, setIsDropdownVisible] = useState(false)
 	const { signOut } = useAuth()
@@ -87,7 +88,18 @@ export function HeaderMenu({ onUpdate }: HeaderMenuProps) {
 							className="px-4 py-3 border-b border-zinc-100"
 						>
 							<Text className="font-regular font-bold text-base text-blue-500">
-								Atualizar
+								Atualizar Dados
+							</Text>
+						</Pressable>
+						<Pressable
+							onPress={async () => {
+								setIsDropdownVisible(false)
+								await onCheckUpdate()
+							}}
+							className="px-4 py-3 border-b border-zinc-100"
+						>
+							<Text className="font-regular font-bold text-base text-blue-500">
+								Atualiazação
 							</Text>
 						</Pressable>
 						<Pressable

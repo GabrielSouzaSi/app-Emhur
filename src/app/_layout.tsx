@@ -1,8 +1,9 @@
+import { UpdateAppModal } from "@/components/UpdateAppModal"
 import "@/styles/global.css"
 import { useDrizzleStudio } from "expo-drizzle-studio-plugin"
 import { Stack, useRootNavigationState, useRouter } from "expo-router"
 import * as SplashScreen from "expo-splash-screen"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { LogBox, StatusBar } from "react-native"
 import Toast from "react-native-toast-message"
 
@@ -23,11 +24,14 @@ import {
 import { CustomToast } from "@/components/CustomToast"
 import { AuthContextProvider } from "@/contexts/AuthContext"
 import { useAuth } from "@/hooks/useAuth"
+import { checkUpdate, UpdateInfo } from "@/utils/checkUpdate"
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context"
 
 SplashScreen.preventAutoHideAsync()
 
 function StackLayout() {
+	const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null)
+	const [modalVisible, setModalVisible] = useState(false)
 	const { user, isBootstrapping } = useAuth()
 	const nav = useRootNavigationState()
 	const { success, error } = useMigrations(db, migrations)
@@ -52,6 +56,19 @@ function StackLayout() {
 		if (isBootstrapping) return
 		SplashScreen.hideAsync().catch(() => {})
 	}, [nav?.key, isBootstrapping, isFontLoaded])
+
+	useEffect(() => {
+		async function verifyUpdate() {
+			const result = await checkUpdate()
+
+			if (result?.hasUpdate) {
+				setUpdateInfo(result)
+				setModalVisible(true)
+			}
+		}
+
+		verifyUpdate()
+	}, [])
 
 	// Durante o boot inicial, deixe o Splash cuidar da tela
 	if (!nav?.key || isBootstrapping) return null
@@ -87,6 +104,17 @@ function StackLayout() {
 						<Stack.Screen name="(auth)" />
 					</Stack.Protected>
 				</Stack>
+				{updateInfo && (
+					<UpdateAppModal
+						visible={modalVisible}
+						version={updateInfo.latestVersion}
+						message={updateInfo.message}
+						releaseNotes={updateInfo.releaseNotes}
+						storeUrl={updateInfo.storeUrl}
+						required={updateInfo.required}
+						onClose={() => setModalVisible(false)}
+					/>
+				)}
 				<Toast
 					config={{
 						success: (props) => <CustomToast {...props} type="success" />,
