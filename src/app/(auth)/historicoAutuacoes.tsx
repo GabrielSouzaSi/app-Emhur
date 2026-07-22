@@ -47,12 +47,10 @@ export default function HistoricoAutuacoes() {
 
 			const formData = new FormData()
 			formData.append("permit_holder_id", `${data.permit_holder_id.id}`)
-			formData.append("user_id", `${user.id}`)
+			formData.append("user_id", `${user?.id}`)
 			formData.append("vehicle_id", `${data.vehicle_id.id}`)
 			formData.append("approach_id", `${dBAutuacao.approach}`)
-			dBAutuacao.idInfracao.forEach((id) => {
-				formData.append("violation_code_id[]", id.toString())
-			})
+			dBAutuacao.idInfracao && formData.append("violation_code_id[]", dBAutuacao.idInfracao)
 			formData.append("violation_date", dBAutuacao.data)
 			formData.append("violation_time", dBAutuacao.hora)
 			formData.append("latitude", `${dBAutuacao.latitude}`)
@@ -65,7 +63,7 @@ export default function HistoricoAutuacoes() {
 					dBAutuacao.driverTypeId == "1"
 						? data.permit_holder_id.name
 						: dBAutuacao.driverName
-				}`
+				}`,
 			)
 			formData.append(
 				"driver_cpf",
@@ -73,7 +71,7 @@ export default function HistoricoAutuacoes() {
 					dBAutuacao.driverTypeId == "1"
 						? data.permit_holder_id.cpf
 						: dBAutuacao.driverCpf
-				}`
+				}`,
 			)
 			formData.append(
 				"driver_cnh",
@@ -81,7 +79,7 @@ export default function HistoricoAutuacoes() {
 					dBAutuacao.driverTypeId == "1"
 						? data.permit_holder_id.cnh
 						: dBAutuacao.driverCnh
-				}`
+				}`,
 			)
 
 			formData.append("signature_base64", `${dBAutuacao.signatureUri}`)
@@ -166,7 +164,7 @@ export default function HistoricoAutuacoes() {
 		useCallback(() => {
 			fetchViolations()
 			return () => {}
-		}, [])
+		}, []),
 	)
 
 	return (

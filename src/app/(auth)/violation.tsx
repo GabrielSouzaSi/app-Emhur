@@ -4,7 +4,6 @@ import * as ScreenOrientation from "expo-screen-orientation"
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
 	Alert,
-	Dimensions,
 	FlatList,
 	Image,
 	Keyboard,
@@ -13,6 +12,7 @@ import {
 	ScrollView,
 	Text,
 	TouchableOpacity,
+	useWindowDimensions,
 	View,
 } from "react-native"
 import SignatureCanvas from "react-native-signature-canvas"
@@ -44,6 +44,7 @@ import { getDatabaseDriverType } from "@/database/driverTypes"
 import { getDatabasePermitType } from "@/database/permitType"
 import { saveSignatureAsPng } from "@/utils/file"
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view"
+import { SafeAreaView } from "react-native-safe-area-context"
 import Toast from "react-native-toast-message"
 import colors from "tailwindcss/colors"
 
@@ -78,7 +79,7 @@ export type ViolationCode = {
 
 export default function Autuacaoes() {
 	const ref = useRef<any>(null)
-	const { width, height } = Dimensions.get("window")
+	const { width, height } = useWindowDimensions()
 
 	// informação do usuário
 	const { user } = useAuth()
@@ -134,6 +135,7 @@ export default function Autuacaoes() {
 	// Assinatura
 	const [signatureUri, setSignatureUri] = useState<string>("")
 	const [signaturePngUri, setSignaturePngUri] = useState<string>("")
+	const [showCanvas, setShowCanvas] = useState(false)
 
 	const {
 		control,
@@ -153,6 +155,7 @@ export default function Autuacaoes() {
 			setVehicle(vehicle_id)
 			setPermitHolder(permit_holder_id)
 			setPermitType(data.permit_type.id.toString())
+			//console.log(JSON.stringify(data, null, 2))
 		} catch (error) {
 			Toast.show({
 				type: "error",
@@ -173,12 +176,12 @@ export default function Autuacaoes() {
 			setDriverCnh(data.cnh)
 			setDriverName(data.name)
 			Alert.alert("Sucesso", "Assistente encontrado!")
-		} catch (error) {
+		} catch (error: any) {
 			if (error.response) {
-				console.log("Erro da API:", error.response.data)
+				// console.log("Erro da API:", error.response.data)
 				Alert.alert("Aviso", error.response.data.erro || "Erro desconhecido!")
 			} else {
-				console.log("Erro desconhecido:", error.message)
+				// console.log("Erro desconhecido:", error.message)
 				Alert.alert("Erro", "Não foi possível encontrar o condutor.")
 			}
 		} finally {
@@ -188,7 +191,7 @@ export default function Autuacaoes() {
 	// Função para trazer os dados da tabela infracoes
 	async function getViolationCode(permitTypeId: number) {
 		try {
-			const response = await getDatabaseViolationCode()
+			const response: any = await getDatabaseViolationCode()
 
 			const filtered = response.filter(
 				(item: ViolationCode) => item.permitTypeId === permitTypeId,
@@ -203,7 +206,7 @@ export default function Autuacaoes() {
 			setCodigo(cod)
 			setSelecText(cod)
 		} catch (error) {
-			console.log("fetchInfracoes =>" + error)
+			// console.log("fetchInfracoes =>" + error)
 		} finally {
 			setIsLoaded(false)
 		}
@@ -211,7 +214,7 @@ export default function Autuacaoes() {
 	// Função para trazer os dados do tipo de condutor
 	async function getDriverType() {
 		try {
-			const response = await getDatabaseDriverType()
+			const response: any = await getDatabaseDriverType()
 			// console.log(response);
 
 			let result = response.map((item: any) => {
@@ -223,13 +226,13 @@ export default function Autuacaoes() {
 
 			setDriverType(result)
 		} catch (error) {
-			console.log("getViolationCode error =>" + error)
+			// console.log("getViolationCode error =>" + error)
 		}
 	}
 	// Função para trazer os dados da tabela approach
 	async function getApproach() {
 		try {
-			const response = await getDatabaseApproach()
+			const response: any = await getDatabaseApproach()
 
 			let optionApproach = response.map((data: any) => {
 				return {
@@ -240,13 +243,13 @@ export default function Autuacaoes() {
 
 			setApproach(optionApproach)
 		} catch (error) {
-			console.log("getApproach error =>" + error)
+			// console.log("getApproach error =>" + error)
 		}
 	}
 	// Função para trazer os dados da tabela permitType
 	async function getPermitType() {
 		try {
-			const response = await getDatabasePermitType()
+			const response: any = await getDatabasePermitType()
 
 			let optionPermitType = response.map((data: any) => {
 				return {
@@ -257,11 +260,16 @@ export default function Autuacaoes() {
 
 			setPermitTypeOption(optionPermitType)
 		} catch (error) {
-			console.log("getApproach error =>" + error)
+			// console.log("getApproach error =>" + error)
 		}
 	}
 	// Criar a autuacao
 	async function postViolation(data: FormData) {
+		let code
+		if (idInfracao.length > 0) {
+			code = idInfracao[0].toString()
+			code = code.slice(0, -1)
+		}
 		setIsLoaded(true)
 		let status = await statusGPS()
 		if (status) {
@@ -283,12 +291,10 @@ export default function Autuacaoes() {
 
 			const formData = new FormData()
 			formData.append("permit_holder_id", `${permitHolder?.id}`)
-			formData.append("user_id", `${user.id}`)
+			formData.append("user_id", `${user?.id}`)
 			formData.append("vehicle_id", `${vehicle?.id}`)
 			formData.append("approach_id", `${abordagem}`)
-			idInfracao.forEach((id) => {
-				formData.append("violation_code_id[]", id.toString())
-			})
+			code && formData.append("violation_code_id[]", code)
 			formData.append("violation_date", date)
 			formData.append("violation_time", time)
 			formData.append("latitude", `${loc.coords.latitude}`)
@@ -334,7 +340,7 @@ export default function Autuacaoes() {
 				router.back()
 			} catch (error: any) {
 				// 2️⃣ Se houver falha de rede ou servidor → salva offline
-				console.log("⚠️ Falha no envio, salvando offline:", error?.message)
+				//console.log("⚠️ Falha no envio, salvando offline:", error?.message)
 				await addViolation(data)
 			} finally {
 				setIsLoaded(false)
@@ -345,6 +351,7 @@ export default function Autuacaoes() {
 	}
 	// Cadastra a autuação no banco
 	async function addViolation(form: FormData) {
+		let code
 		try {
 			let loc = await statusGPS()
 			if (!loc) return
@@ -354,6 +361,11 @@ export default function Autuacaoes() {
 				currentdate.getMonth() + 1
 			}-${currentdate.getDate()}`
 			const time = `${currentdate.getHours()}:${currentdate.getMinutes()}:${currentdate.getSeconds()}`
+
+			if (idInfracao.length > 0) {
+				code = idInfracao[0].toString()
+				code = code.slice(0, -1)
+			}
 
 			const data = [
 				{
@@ -370,7 +382,7 @@ export default function Autuacaoes() {
 					data: date,
 					hora: time,
 					approach: `${abordagem}`,
-					idInfracao: idInfracao,
+					idInfracao: code,
 					obs: `${
 						refused ? "O condutor se recusou a assinar o auto de infração.\n" : ""
 					}${obs || refused ? obs : "Sem observações"}`,
@@ -390,7 +402,7 @@ export default function Autuacaoes() {
 				text1: "Algo deu errado!",
 				text2: "Não foi possível salvar!",
 			})
-			console.log(error)
+			// console.log(error)
 		}
 	}
 
@@ -424,7 +436,7 @@ export default function Autuacaoes() {
 	}
 	// Função para preparar o componente RadioButton
 	const onSelectMode = (item: any) => {
-		console.log(permitHolder)
+		//console.log(permitHolder)
 
 		setAbordagem(item.value)
 		setDriverTypeId("1")
@@ -437,20 +449,25 @@ export default function Autuacaoes() {
 	// Função para pegar o tipo de condutor selecionado
 	const onSelectDriverType = (item: any) => {
 		setDriverTypeId(item)
-		console.log(permitHolder)
-
+		//console.log("item: ", item)
 		if (item === "1") {
 			setDriverName(permitHolder ? permitHolder.name : "")
 			setDriverCpf(permitHolder ? permitHolder.cpf : "")
 			setDriverCnh(permitHolder ? permitHolder.cnh : "")
+		} else if (item === "2") {
+			setDriverName("")
+			setDriverCpf("")
+			setDriverCnh("")
+		} else if (item === "3") {
+			setDriverName("")
+			setDriverCpf("")
+			setDriverCnh("")
 		}
 	}
 
-	{
-		/* renderItem otimizado */
-	}
+	//renderItem otimizado
 	const renderItem = useCallback(
-		({ item }) => {
+		({ item }: { item: ListCod }) => {
 			const isSelected = idInfracao.includes(item.id)
 
 			return (
@@ -475,6 +492,7 @@ export default function Autuacaoes() {
 	// Função para marcar/desmarcar seleção
 	function onSelectData(item: ListCod) {
 		clearErrors("infracoes")
+		//console.log("Codido selecionado => " + JSON.stringify(item, null, 2))
 
 		// 👉 Se o item já está selecionado, desmarca tudo
 		if (idInfracao.includes(item.id)) {
@@ -508,22 +526,24 @@ export default function Autuacaoes() {
 	// Função chamada quando a assinatura é concluída
 	const handleSignature = async (signature: string) => {
 		//console.log("Base64 da assinatura:", signature);
-		setModal(MODAL.NONE)
-		setSignatureUri(signature)
-		const signaturepng = await saveSignatureAsPng(signature)
-		setSignaturePngUri(signaturepng)
+		try {
+			setSignatureUri(signature)
+
+			const signaturePng = await saveSignatureAsPng(signature)
+			setSignaturePngUri(signaturePng)
+
+			closeSignatureModal()
+		} catch (error) {
+			console.log("Erro ao salvar assinatura:", error)
+			Alert.alert("Erro", "Não foi possível salvar a assinatura.")
+		}
 	}
 
 	// Função para limpar a assinatura
 	const handleClear = () => {
 		ref.current?.clearSignature()
-		if (signatureUri) {
-			setModal(MODAL.NONE)
-			setSignatureUri("")
-			setTimeout(() => {
-				setModal(MODAL.SIGNATURE)
-			}, 1200)
-		}
+		setSignatureUri("")
+		setSignaturePngUri("")
 	}
 	// Função para salvar a assinatura
 	const handleSave = () => ref.current?.readSignature()
@@ -564,6 +584,33 @@ export default function Autuacaoes() {
 		}
 	}
 
+	const openSignatureModal = async () => {
+		try {
+			setShowCanvas(false)
+
+			// Primeiro gira a tela.
+			await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
+
+			// Somente depois abre o modal.
+			setModal(MODAL.SIGNATURE)
+		} catch (error) {
+			console.log("Erro ao abrir assinatura:", error)
+		}
+	}
+
+	const closeSignatureModal = async () => {
+		setShowCanvas(false)
+		setModal(MODAL.NONE)
+
+		requestAnimationFrame(async () => {
+			try {
+				await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
+			} catch (error) {
+				console.log("Erro ao restaurar orientação:", error)
+			}
+		})
+	}
+
 	useEffect(() => {
 		getPermissionGPS()
 	}, [])
@@ -594,16 +641,6 @@ export default function Autuacaoes() {
   `
 
 	// 🔄 Bloqueia rotação ao abrir/fechar modal
-	useEffect(() => {
-		async function lockOrientation() {
-			if (modal === MODAL.SIGNATURE) {
-				await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
-			} else {
-				await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP)
-			}
-		}
-		lockOrientation()
-	}, [modal])
 
 	return (
 		<>
@@ -617,6 +654,7 @@ export default function Autuacaoes() {
 			>
 				{/* Cabeçalho */}
 				<HeaderBack title="Cadastrar Autuação" variant="primary" />
+
 				<View className="flex p-4">
 					{/* Numero da infração */}
 					<View className="flex-row items-center mb-5">
@@ -673,7 +711,7 @@ export default function Autuacaoes() {
 					</View>
 
 					{/* Modo de abordagem */}
-					{approach.length ? (
+					{approach.length > 0 && (
 						<View className="mb-4">
 							<Text className="text-gray-500 font-regular text-2xl font-bold">
 								Modo de Abordagem:
@@ -696,8 +734,6 @@ export default function Autuacaoes() {
 								)}
 							/>
 						</View>
-					) : (
-						<></>
 					)}
 
 					{/* Tipo de Condutor */}
@@ -742,13 +778,22 @@ export default function Autuacaoes() {
 									<Text className="text-gray-500 font-regular text-2xl font-bold">
 										CPF:
 									</Text>
-									<Field
+									{/* <Field
 										placeholder="CPF"
 										variant="primary"
 										onChangeText={setDriverCpf}
 										onSubmitEditing={() => searchAssistentCPF(driverCpf)}
 										returnKeyType="send"
 										value={driverCpf}
+									/> */}
+									<Search
+										placeholder="CPF"
+										onChangeText={setDriverCpf}
+										value={driverCpf}
+										onSubmitEditing={() => searchAssistentCPF(driverCpf)}
+										returnKeyType="send"
+										keyboardType="numeric"
+										onSearch={() => searchAssistentCPF(driverCpf)}
 									/>
 								</View>
 								<View className="flex-1">
@@ -768,11 +813,7 @@ export default function Autuacaoes() {
 
 					{abordagem === 1 && (
 						<>
-							<Button
-								variant="primary"
-								className="mt-4"
-								onPress={() => setModal(MODAL.SIGNATURE)}
-							>
+							<Button variant="primary" className="mt-4" onPress={openSignatureModal}>
 								<Button.TextButton title="Assinatura" />
 							</Button>
 							<Button
@@ -935,7 +976,7 @@ export default function Autuacaoes() {
 					visible={modal === MODAL.IMAGENS}
 					onClose={() => setModal(MODAL.NONE)}
 				>
-					<View className="flex-1">
+					<SafeAreaView className="flex-1 bg-white" edges={["top", "bottom"]}>
 						<FlatList
 							data={imagens}
 							renderItem={({ item, index }) => (
@@ -960,7 +1001,7 @@ export default function Autuacaoes() {
 							)}
 							showsVerticalScrollIndicator={false}
 						/>
-					</View>
+					</SafeAreaView>
 				</Modal>
 
 				{/* Modal de seleção do código da infração */}
@@ -969,7 +1010,7 @@ export default function Autuacaoes() {
 					animationType="slide"
 					onRequestClose={() => setModal(MODAL.NONE)}
 				>
-					<View className="flex-1 bg-white p-4">
+					<SafeAreaView className="flex-1 bg-white  p-4" edges={["top", "bottom"]}>
 						<TouchableOpacity
 							activeOpacity={0.7}
 							className="self-end mb-4"
@@ -996,44 +1037,80 @@ export default function Autuacaoes() {
 							showsVerticalScrollIndicator={false}
 							scrollEnabled
 						/>
-					</View>
+					</SafeAreaView>
 				</RNModal>
 
 				{/* Assinatura */}
-				<RNModal
-					visible={modal === MODAL.SIGNATURE}
-					animationType="slide"
-					onRequestClose={() => setModal(MODAL.NONE)}
-				>
-					<View className="flex-row bg-white" style={{ width: height, height: width }}>
-						{/* Painel lateral */}
-						<View className="bg-gray-50 border-r border-gray-200 justify-center gap-4 ml-1">
-							<Button variant="primary" onPress={() => setModal(MODAL.NONE)}>
-								<Button.TextButton title="Fechar" />
-							</Button>
+				{modal === MODAL.SIGNATURE && (
+					<RNModal
+						visible
+						animationType="slide"
+						supportedOrientations={["landscape"]}
+						onShow={() => {
+							// Pequeno intervalo para o WebView receber as dimensões definitivas.
+							requestAnimationFrame(() => {
+								setShowCanvas(true)
+							})
+						}}
+						onRequestClose={closeSignatureModal}
+					>
+						<SafeAreaView
+							className="flex-1 bg-white"
+							edges={["top", "bottom", "left", "right"]}
+						>
+							<View className="flex-1 flex-row">
+								{/* Painel lateral */}
+								<View className="bg-gray-50 border-r border-gray-200 justify-center gap-4 px-2">
+									<Button variant="primary" onPress={closeSignatureModal}>
+										<Button.TextButton title="Fechar" />
+									</Button>
 
-							<Button variant="primary" onPress={handleClear}>
-								<Button.TextButton title="Limpar" />
-							</Button>
+									<Button variant="primary" onPress={handleClear}>
+										<Button.TextButton title="Limpar" />
+									</Button>
 
-							<Button variant="primary" onPress={handleSave}>
-								<Button.TextButton title="Salvar" />
-							</Button>
-						</View>
+									<Button variant="primary" onPress={handleSave}>
+										<Button.TextButton title="Salvar" />
+									</Button>
+								</View>
 
-						{/* Área de assinatura */}
-						<View className="flex-1 p-4 justify-center items-center">
-							<SignatureCanvas
-								ref={ref}
-								onOK={handleSignature}
-								webStyle={webStyle}
-								backgroundColor="#fff"
-								penColor="black"
-								dataURL={signatureUri || ""}
-							/>
-						</View>
-					</View>
-				</RNModal>
+								{/* Área de assinatura */}
+								<View className="flex-1 p-4">
+									{showCanvas && (
+										<SignatureCanvas
+											ref={ref}
+											onOK={handleSignature}
+											onEmpty={() => {
+												Alert.alert(
+													"Assinatura",
+													"Faça uma assinatura antes de salvar.",
+												)
+											}}
+											onError={(error) => {
+												console.log("Erro no canvas:", error)
+											}}
+											webStyle={webStyle}
+											backgroundColor="#fff"
+											penColor="black"
+											dataURL={signatureUri}
+											autoClear={false}
+											style={{ flex: 1 }}
+											webviewContainerStyle={{
+												flex: 1,
+											}}
+											webviewProps={{
+												cacheEnabled: false,
+												androidLayerType: "software",
+												bounces: false,
+												scrollEnabled: false,
+											}}
+										/>
+									)}
+								</View>
+							</View>
+						</SafeAreaView>
+					</RNModal>
+				)}
 			</KeyboardAwareScrollView>
 			{isLoaded && <Loading />}
 		</>
