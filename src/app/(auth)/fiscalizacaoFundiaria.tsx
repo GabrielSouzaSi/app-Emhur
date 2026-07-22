@@ -1,6 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy"
 import { useFocusEffect, useRouter } from "expo-router"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 import { Alert, ScrollView, Text, View } from "react-native"
 import Share from "react-native-share"
 
@@ -10,18 +10,29 @@ import FundiaryCardOffline from "@/components/FundiaryCardOffline"
 import { HeaderBack } from "@/components/headerBack"
 import { LoadingLight } from "@/components/loading"
 import { Modal } from "@/components/RNModal"
+import { delDatabaseFormEntriesId, getDatabaseFormEntries } from "@/database/formEntries"
 import {
 	delDatabaseFundiaryInspection,
 	getDatabaseFundiaryInspection,
 } from "@/database/fundiaryInspections"
+import { getDatabaseLandSchemaForm } from "@/database/landSchemaForm"
+import { getDatabaseLandTypeForms } from "@/database/landTypeForm"
 import { FundiaryInspectionDTO } from "@/dtos/FundiaryInspectionDTO"
 import { server } from "@/server/api"
-import { getOfflineEntryAll } from "@/services/formOfflineService"
+import { buildFormDataFromSchema } from "@/utils/formSubmission"
+import axios from "axios"
 import Toast from "react-native-toast-message"
 
 enum MODAL {
 	NONE = 0,
 	OPTIONS = 1,
+	TYPEFORMS = 2,
+}
+
+type TypeForm = {
+	id: number
+	name?: string
+	description?: string
 }
 
 export default function HistoricoFiscalizacaoFundiaria() {
@@ -31,6 +42,7 @@ export default function HistoricoFiscalizacaoFundiaria() {
 	const [selectedInspection, setSelectedInspection] = useState<FundiaryInspectionDTO | null>(null)
 	const [rawJson, setRawJson] = useState<string | null>(null)
 	const [cardForm, setCardForm] = useState<any[]>([])
+	const [typeForms, setTypeForms] = useState<TypeForm[]>([])
 
 	const router = useRouter()
 
@@ -115,6 +127,25 @@ ${item.observations || "Sem observações"}
 
 		//console.log("JSON PURO FUNDIÁRIA:\n", json)
 		setRawJson(json)
+	}
+
+	async function handleSendFundiaryInspection(id: number) {
+		setIsLoaded(true)
+		let result = cardForm.find((item) => item.id === id)
+		let resul = await getDatabaseLandSchemaForm(result.type_form_id)
+
+		const formData = buildFormDataFromSchema(resul.schema, result.data)
+
+		//console.log(JSON.stringify(formData, null, 2))
+		try {
+			await server.postForm(result.endpoint, formData)
+			await delDatabaseFormEntriesId(id)
+			await load()
+		} catch (error) {
+			Alert.alert("Algo deu errado!", "Tente novamente!")
+		} finally {
+			setIsLoaded(false)
+		}
 	}
 
 	async function prepareImagesForShare(item: FundiaryInspectionDTO) {
@@ -316,7 +347,117 @@ ${item.observations || "Sem observações"}
 		setModal(MODAL.NONE)
 	}
 
-	const confirmDeleteFundiaryInspection = () => {
+	async function preparePdfForShare(uri: string) {
+		const normalizedUri = uri.startsWith("file://") ? uri : `file://${uri}`
+
+		const info = await FileSystem.getInfoAsync(normalizedUri)
+		if (!info.exists) {
+			throw new Error("PDF não encontrado no dispositivo.")
+		}
+
+		const destUri = `${FileSystem.cacheDirectory}pdf_${Date.now()}.pdf`
+
+		await FileSystem.copyAsync({
+			from: normalizedUri,
+			to: destUri,
+		})
+
+		return destUri
+	}
+
+	async function openPdfWithShare(uri: string) {
+		const preparedUri = await preparePdfForShare(uri)
+
+		await Share.open({
+			title: "Visualizar PDF",
+			url: preparedUri,
+			type: "application/pdf",
+			failOnCancel: false,
+			showAppsToView: true,
+		})
+
+		return preparedUri
+	}
+
+	async function downloadPdf(url: string) {
+		const fileUri = FileSystem.documentDirectory + `arquivo_${Date.now()}.pdf`
+
+		const downloadResumable = FileSystem.createDownloadResumable(url, fileUri)
+		const result = await downloadResumable.downloadAsync()
+
+		if (!result || result.status !== 200) {
+			throw new Error(`Falha no download do PDF. Status: ${result?.status ?? "sem resposta"}`)
+		}
+
+		return result.uri
+	}
+
+	const handleViewPDFSelected = async (id: number) => {
+		setIsLoaded(true)
+
+		let preparedPdfUri: string | null = null
+
+		try {
+			const selected = cardForm.find((item) => item.id === id)
+
+			if (!selected) {
+				throw new Error("Registro não encontrado na tabela.")
+			}
+
+			const schemaResult = await getDatabaseLandSchemaForm(selected.type_form_id)
+
+			if (!schemaResult || !schemaResult.schema) {
+				throw new Error("Schema não encontrado no banco.")
+			}
+
+			const formData = buildFormDataFromSchema(schemaResult.schema, selected.data)
+
+			const response = await axios.postForm(
+				"https://n8n-n8n.uwbc6t.easypanel.host/webhook-test/test",
+				formData,
+				{ timeout: 120000 },
+			)
+
+			const link = response?.data?.link
+
+			if (!link || typeof link !== "string") {
+				throw new Error("O webhook não retornou response.data.link")
+			}
+
+			const uri = await downloadPdf(link)
+			console.log("PDF salvo em:", uri)
+
+			preparedPdfUri = await openPdfWithShare(uri)
+		} catch (error: any) {
+			console.log("handleViewPDFSelected error =>", error)
+			console.log("error.response?.data =>", error?.response?.data)
+			console.log("error.message =>", error?.message)
+
+			Alert.alert(
+				"Algo deu errado!",
+				error?.response?.data?.message || error?.message || "Tente novamente!",
+			)
+		} finally {
+			if (preparedPdfUri) {
+				try {
+					await FileSystem.deleteAsync(preparedPdfUri, { idempotent: true })
+				} catch {}
+			}
+
+			setIsLoaded(false)
+		}
+	}
+
+	const confirmDeleteFundiaryInspection = (id?: number) => {
+		console.log(id)
+
+		if (id) {
+			Alert.alert("Atenção!", "Tem certeza que deseja excluir essa fiscalização fundiária?", [
+				{ text: "Cancelar", style: "cancel" },
+				{ text: "Excluir", onPress: () => deleteFundiaryInspection(id) },
+			])
+		}
+
 		if (!selectedInspection?.id) return
 
 		Alert.alert("Atenção!", "Tem certeza que deseja excluir essa fiscalização fundiária?", [
@@ -325,7 +466,21 @@ ${item.observations || "Sem observações"}
 		])
 	}
 
-	const deleteFundiaryInspection = async () => {
+	const deleteFundiaryInspection = async (id?: number) => {
+		if (id) {
+			setModal(MODAL.NONE)
+			setIsLoaded(true)
+
+			try {
+				await delDatabaseFormEntriesId(id)
+				await load()
+				Alert.alert("Aviso!", "Fiscalização fundiária excluída com sucesso!")
+			} catch (error) {
+				Alert.alert("Algo deu errado!", "Tente novamente!")
+			} finally {
+				setIsLoaded(false)
+			}
+		}
 		if (!selectedInspection?.id) return
 
 		setModal(MODAL.NONE)
@@ -345,46 +500,36 @@ ${item.observations || "Sem observações"}
 	async function getInspectionsFundiary() {
 		try {
 			const response = await getDatabaseFundiaryInspection()
-			//console.log(response)
+			console.log(response)
 
-			setInspectionsFundiary(response)
+			setInspectionsFundiary(response as any)
 		} catch (error) {
 			Alert.alert("Atenção!", "Erro ao buscar as fiscalizações fundiárias no banco!")
 		}
 	}
 
+	async function load() {
+		const [entryAll, typeForm] = await Promise.all([
+			getDatabaseFormEntries(),
+			getDatabaseLandTypeForms(),
+		])
+
+		setTypeForms(typeForm)
+		// if (entryAll.length === 0) {
+		// 	return
+		// }
+
+		// console.log(JSON.stringify(data, null, 2))
+		setCardForm(entryAll)
+	}
+
 	useFocusEffect(
 		useCallback(() => {
+			load()
 			getInspectionsFundiary()
 			return () => {}
 		}, []),
 	)
-
-	useEffect(() => {
-		async function load() {
-			const entryAll = await getOfflineEntryAll()
-
-			if (entryAll.length === 0) {
-				return
-			}
-
-			const data = entryAll.map((entry) => {
-				return {
-					id: entry.id,
-					title: entry.title,
-					schemaId: entry.schemaId,
-					updatedAt: entry.updatedAt,
-					errorMessage: entry.errorMessage,
-					data: JSON.parse(entry.data),
-				}
-			})
-
-			// console.log(JSON.stringify(data, null, 2))
-			setCardForm(data)
-		}
-
-		load()
-	}, [])
 
 	return (
 		<View className="flex-1">
@@ -417,13 +562,52 @@ ${item.observations || "Sem observações"}
 				</View>
 			)}
 
-			{cardForm.length > 0 && <FundiaryCardOffline data={cardForm} />}
+			{cardForm.length > 0 && (
+				<FundiaryCardOffline
+					data={cardForm}
+					onDelete={confirmDeleteFundiaryInspection}
+					onSend={handleSendFundiaryInspection}
+					onView={handleViewPDFSelected}
+				/>
+			)}
 
 			<View className="absolute bottom-1 w-full p-4 flex-row justify-center">
-				<Button variant="primary" onPress={() => router.push("/(auth)/fundiariaForm")}>
+				<Button
+					variant="primary"
+					onPress={() => {
+						//setModal(MODAL.TYPEFORMS)
+						router.push("/(auth)/fundiariaForm")
+					}}
+				>
 					<Button.TextButton title="Formulário" />
 				</Button>
 			</View>
+
+			<Modal isOpen={modal === MODAL.TYPEFORMS}>
+				<View className="w-full rounded-xl bg-white p-4">
+					<View className="gap-5">
+						{typeForms.length > 0 &&
+							typeForms.map((typeForm) => (
+								<Button
+									key={typeForm.id}
+									variant="primary"
+									onPress={() => {
+										router.push({
+											pathname: "/(auth)/fundiariaFormold",
+											params: { typeFormId: typeForm.id },
+										})
+										setModal(MODAL.NONE)
+									}}
+								>
+									<Button.TextButton title={typeForm.name ?? ""} />
+								</Button>
+							))}
+						<Button variant="primary" onPress={() => setModal(MODAL.NONE)}>
+							<Button.TextButton title="Fechar" />
+						</Button>
+					</View>
+				</View>
+			</Modal>
 
 			<Modal isOpen={modal === MODAL.OPTIONS}>
 				<View className="w-full rounded-xl bg-white p-4">
@@ -444,7 +628,7 @@ ${item.observations || "Sem observações"}
 							<Button.TextButton title="Enviar completo" />
 						</Button>
 
-						<Button variant="primary" onPress={confirmDeleteFundiaryInspection}>
+						<Button variant="primary" onPress={() => confirmDeleteFundiaryInspection}>
 							<Button.TextButton title="Excluir" />
 						</Button>
 
