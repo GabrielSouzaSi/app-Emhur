@@ -4,7 +4,9 @@ import { FlatList, Pressable, Text, View } from "react-native"
 
 type DataForm = {
 	id: number
+	type_form_id: number
 	title: string
+	schemaVersion: string
 	schemaId: string
 	updatedAt: string
 	errorMessage: string
@@ -13,6 +15,9 @@ type DataForm = {
 
 type DataCardProps = {
 	data: DataForm[]
+	onDelete: (id: number) => void
+	onSend: (id: number) => void
+	onView: (id: number) => void
 }
 
 function formatDate(dateString: string) {
@@ -29,7 +34,7 @@ function formatDate(dateString: string) {
 	return `${day}/${month}/${year} - ${hours}:${minutes}:${seconds}`
 }
 
-const FundiaryCardOffline: React.FC<DataCardProps> = ({ data }) => {
+const FundiaryCardOffline: React.FC<DataCardProps> = ({ data, onDelete, onSend, onView }) => {
 	return (
 		<FlatList
 			data={data}
@@ -42,6 +47,7 @@ const FundiaryCardOffline: React.FC<DataCardProps> = ({ data }) => {
 							<View className="flex-1 pr-3">
 								<Text className="text-lg font-bold text-gray-900">
 									{item.title ?? item.schemaId}
+									{` - ${item.schemaVersion ?? ""}`}
 								</Text>
 								<Text className="mt-1 text-sm text-gray-500">
 									{formatDate(item.updatedAt)}
@@ -99,7 +105,7 @@ const FundiaryCardOffline: React.FC<DataCardProps> = ({ data }) => {
 							onPress={() => {
 								router.push({
 									pathname: "/(auth)/fundiariaFormold",
-									params: { entryId: item.id },
+									params: { entryId: item.id, typeFormId: item.type_form_id },
 								})
 							}}
 						>
@@ -108,13 +114,28 @@ const FundiaryCardOffline: React.FC<DataCardProps> = ({ data }) => {
 
 						<View className="w-px bg-gray-200" />
 
-						<Pressable className="flex-1 items-center justify-center py-3 active:opacity-70">
+						<Pressable
+							onPress={() => onView(item.id)}
+							className="flex-1 items-center justify-center py-3 active:opacity-70"
+						>
+							<Text className="text-base font-bold text-purple-600">PDF</Text>
+						</Pressable>
+
+						<View className="w-px bg-gray-200" />
+
+						<Pressable
+							onPress={() => onSend(item.id)}
+							className="flex-1 items-center justify-center py-3 active:opacity-70"
+						>
 							<Text className="text-base font-bold text-emerald-600">Enviar</Text>
 						</Pressable>
 
 						<View className="w-px bg-gray-200" />
 
-						<Pressable className="flex-1 items-center justify-center py-3 active:opacity-70">
+						<Pressable
+							onPress={() => onDelete(item.id)}
+							className="flex-1 items-center justify-center py-3 active:opacity-70"
+						>
 							<Text className="text-base font-bold text-red-500">Excluir</Text>
 						</Pressable>
 					</View>

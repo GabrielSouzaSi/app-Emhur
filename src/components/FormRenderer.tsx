@@ -1,15 +1,17 @@
 // src/components/FormRenderer.tsx
 
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useForm, useWatch } from "react-hook-form"
+import { Alert, Text, TouchableOpacity, View } from "react-native"
+
 import { Button } from "@/components/button"
 import type { ApiField, FormSchema } from "@/dtos/formTypes"
 import {
 	buildDefaultValuesFromSchema,
-	buildSectionRows,
+	buildVisibleSectionRows,
 	isFocusableField,
 } from "@/utils/formSchema"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useForm } from "react-hook-form"
-import { Alert, Text, TouchableOpacity, View } from "react-native"
+import { isFieldVisible } from "@/utils/formVisibility"
 import { FieldRenderer } from "./FieldRenderer"
 import { HeaderBack } from "./headerBack"
 
@@ -31,12 +33,45 @@ export function FormRenderer({ schema, initialValues, onSubmit }: Props) {
 		reset,
 		formState: { errors, isSubmitting },
 		setFocus,
+		getValues,
+		setValue,
+		clearErrors,
 	} = useForm<Record<string, any>>({
 		defaultValues,
 		mode: "onSubmit",
 		reValidateMode: "onChange",
 	})
 
+	const watchedValues = useWatch({ control })
+	const formValues = watchedValues ?? {}
+
+	useEffect(() => {
+		for (const section of schema.sections) {
+			for (const field of section.fields) {
+				const visible = isFieldVisible(field, formValues)
+
+				if (!visible) {
+					let emptyValue: any = ""
+
+					if (field.type === "image") emptyValue = field.multiple ? [] : null
+					else if (field.type === "select") emptyValue = field.multiple ? [] : null
+					else if (field.type === "location") emptyValue = null
+					else emptyValue = ""
+
+					const currentValue = getValues(field.name)
+
+					if (JSON.stringify(currentValue) !== JSON.stringify(emptyValue)) {
+						setValue(field.name, emptyValue, {
+							shouldValidate: false,
+							shouldDirty: false,
+							shouldTouch: false,
+						})
+						clearErrors(field.name)
+					}
+				}
+			}
+		}
+	}, [formValues, schema.sections, getValues, setValue, clearErrors])
 	const fieldRefs = useRef<Record<string, any>>({})
 
 	const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
@@ -57,7 +92,7 @@ export function FormRenderer({ schema, initialValues, onSubmit }: Props) {
 		for (const section of schema.sections) {
 			if (collapsed[section.id]) continue
 
-			const rows = buildSectionRows(section)
+			const rows = buildVisibleSectionRows(section, formValues)
 			for (const row of rows) {
 				for (const field of row) {
 					if (isFocusableField(field)) {
@@ -68,7 +103,7 @@ export function FormRenderer({ schema, initialValues, onSubmit }: Props) {
 		}
 
 		return result
-	}, [schema.sections, collapsed])
+	}, [schema.sections, collapsed, formValues])
 
 	const focusField = useCallback(
 		(fieldName: string) => {
@@ -136,12 +171,16 @@ export function FormRenderer({ schema, initialValues, onSubmit }: Props) {
 
 	return (
 		<View className="flex-1">
-			<HeaderBack title={schema.title ?? "Formulário"} variant="primary" />
+			<HeaderBack
+				title={schema.title ?? "Formulário"}
+				version={schema.schemaVersion ?? ""}
+				variant="primary"
+			/>
 
 			{schema.sections.map((section) => {
 				const isCollapsed = collapsed[section.id]
 				const canCollapse = !!section.collapsible
-				const rows = buildSectionRows(section)
+				const rows = buildVisibleSectionRows(section, formValues)
 
 				return (
 					<View

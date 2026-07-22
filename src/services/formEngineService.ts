@@ -1,133 +1,112 @@
 // src/services/formEngineService.ts
 import { db } from "@/database/connection"
+import { delDatabaseFormEntriesId, replaceMedia } from "@/database/formEntries"
 import { formEntries } from "@/database/schemas/formEntriesSchema"
-import { formMedia } from "@/database/schemas/formMediaSchema"
 import type { FormSchema } from "@/dtos/formTypes"
 import { server } from "@/server/api"
-import { buildFormDataFromSchema, extractPayloadAndFiles } from "@/utils/formSubmission"
+import { buildFormDataFromSchema } from "@/utils/formSubmission"
 import { eq } from "drizzle-orm"
 
 type OfflineEntryParams = {
-    schema: FormSchema
-    values: Record<string, any>
-    entryId?: number
-    errorMessage?: string | null
+	schema: FormSchema
+	values: Record<string, any>
+	entryId?: number
+	errorMessage?: string | null
+	type_form_id: number
 }
 
 const FORCE_OFFLINE_IN_DEV = true
 
 export async function submitFormOnline(schema: FormSchema, values: Record<string, any>) {
-    const formData = buildFormDataFromSchema(schema, values)
-    const response = await server.postForm(schema.endpoint, formData)
-    if (__DEV__ && FORCE_OFFLINE_IN_DEV) {
-        throw new Error("Simulação de modo offline para testes")
-    }
-    return response
+	const formData = buildFormDataFromSchema(schema, values)
+	//console.log(JSON.stringify(formData, null, 2))
+
+	const response = await server.postForm(schema.endpoint, formData)
+	if (__DEV__ && FORCE_OFFLINE_IN_DEV) {
+		throw new Error("Simulação de modo offline para testes")
+	}
+	return response
 }
 
 export async function saveOfflineEntry({
-    schema,
-    values,
-    entryId,
-    errorMessage,
+	schema,
+	values,
+	entryId,
+	type_form_id,
+	errorMessage,
 }: OfflineEntryParams) {
-    const now = new Date().toISOString()
+	const now = new Date().toISOString()
 
-    console.log("saveOfflineEntry:start", { entryId, schemaId: schema.id })
+	console.log("saveOfflineEntry:start", { entryId, schemaId: schema.id })
 
-    const baseData = {
-        schemaId: schema.id,
-        schemaVersion: schema.schemaVersion ?? null,
-        title: schema.title ?? null,
-        endpoint: schema.endpoint,
-        data: JSON.stringify(values),
-        errorMessage: errorMessage ?? null,
-        updatedAt: now,
-    }
+	const baseData = {
+		schemaId: schema.id,
+		type_form_id,
+		schemaVersion: schema.schemaVersion ?? null,
+		title: schema.title ?? null,
+		endpoint: schema.endpoint,
+		data: JSON.stringify(values),
+		errorMessage: errorMessage ?? null,
+		updatedAt: now,
+	}
 
-    if (entryId) {
-        await db.update(formEntries).set(baseData).where(eq(formEntries.id, entryId))
-        await replaceMedia(entryId, schema, values)
-        return entryId
-    }
+	if (entryId) {
+		await db.update(formEntries).set(baseData).where(eq(formEntries.id, entryId))
+		await replaceMedia(entryId, schema, values)
+		return entryId
+	}
 
-    const result = await db.insert(formEntries).values({
-        ...baseData,
-        createdAt: now,
-    })
+	const result = await db.insert(formEntries).values({
+		...baseData,
+		createdAt: now,
+	})
 
-    const insertedId = Number(result.lastInsertRowId)
-    await replaceMedia(insertedId, schema, values)
+	const insertedId = Number(result.lastInsertRowId)
+	await replaceMedia(insertedId, schema, values)
 
-    return insertedId
+	return insertedId
 }
 
 export async function submitOrStoreOffline(
-    schema: FormSchema,
-    values: Record<string, any>,
-    entryId?: number,
+	schema: FormSchema,
+	values: Record<string, any>,
+	type_form_id: number,
+	entryId?: number,
 ) {
-    try {
-        const response = await submitFormOnline(schema, values)
+	console.log("schema \n" + JSON.stringify(schema, null, 2))
+	console.log("values \n" + JSON.stringify(values, null, 2))
 
-        if (entryId) {
-            try {
-                await deleteOfflineEntry(entryId)
-            } catch (deleteError) {
-                console.log("Erro ao remover pendência local após envio:", deleteError)
-            }
-        }
+	try {
+		const response = await submitFormOnline(schema, values)
 
-        return {
-            mode: "online" as const,
-            response,
-        }
-    } catch (error: any) {
-        const message =
-            error?.response?.data?.message ||
-            error?.message ||
-            "Falha ao enviar formulário."
+		if (entryId) {
+			try {
+				await delDatabaseFormEntriesId(entryId)
+			} catch (deleteError) {
+				console.log("Erro ao remover pendência local após envio:", deleteError)
+			}
+		}
 
-        const savedEntryId = await saveOfflineEntry({
-            schema,
-            values,
-            entryId,
-            errorMessage: message,
-        })
+		return {
+			mode: "online" as const,
+			response,
+		}
+	} catch (error: any) {
+		const message =
+			error?.response?.data?.message || error?.message || "Falha ao enviar formulário."
 
-        return {
-            mode: "offline" as const,
-            entryId: savedEntryId,
-            errorMessage: message,
-        }
-    }
-}
+		const savedEntryId = await saveOfflineEntry({
+			schema,
+			values,
+			entryId,
+			errorMessage: message,
+			type_form_id,
+		})
 
-export async function deleteOfflineEntry(entryId: number) {
-    await db.delete(formMedia).where(eq(formMedia.formEntryId, entryId))
-    await db.delete(formEntries).where(eq(formEntries.id, entryId))
-}
-
-async function replaceMedia(
-    formEntryId: number,
-    schema: FormSchema,
-    values: Record<string, any>,
-) {
-    await db.delete(formMedia).where(eq(formMedia.formEntryId, formEntryId))
-
-    const { files } = extractPayloadAndFiles(schema, values)
-    const now = new Date().toISOString()
-
-    if (!files.length) return
-
-    await db.insert(formMedia).values(
-        files.map((item) => ({
-            formEntryId,
-            fieldName: item.fieldName,
-            uri: item.file.uri,
-            name: item.file.name,
-            type: item.file.type,
-            createdAt: now,
-        })),
-    )
+		return {
+			mode: "offline" as const,
+			entryId: savedEntryId,
+			errorMessage: message,
+		}
+	}
 }
