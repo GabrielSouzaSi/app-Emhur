@@ -10,9 +10,10 @@ type Variants = "primary" | "secundary"
 type Props = TouchableOpacityProps & {
 	title: string
 	variant?: Variants
+	version?: string
 }
 
-export function HeaderBack({ title, variant = "secundary", className, ...rest }: Props) {
+export function HeaderBack({ title, variant = "secundary", version, className, ...rest }: Props) {
 	const router = useRouter()
 	return (
 		<View className="bg-white flex flex-row py-3" style={styles.shadow}>
@@ -22,22 +23,33 @@ export function HeaderBack({ title, variant = "secundary", className, ...rest }:
 					"items-center p-1 ml-4 rounded-md",
 					{ "bg-blue-500": variant === "primary" },
 					{ "bg-green-500": variant === "secundary" },
-					className
+					className,
 				)}
 			>
 				<MaterialCommunityIcons name="arrow-left" size={30} color={colors.white} />
 			</TouchableOpacity>
 
-			<View className="flex w-full items-center justify-center absolute py-4">
+			<View className="flex flex-row w-full items-center justify-center absolute py-4">
 				<Text
 					className={clsx(
 						"font-regular text-2xl font-bold",
 						{ "text-blue-500": variant === "primary" },
-						{ "text-green-500": variant === "secundary" }
+						{ "text-green-500": variant === "secundary" },
 					)}
 				>
 					{title}
 				</Text>
+				{version ? (
+					<Text
+						className={clsx(
+							"font-regular text-sm font-bold mt-2 ml-2",
+							{ "text-blue-500": variant === "primary" },
+							{ "text-green-500": variant === "secundary" },
+						)}
+					>
+						{version}
+					</Text>
+				) : null}
 			</View>
 		</View>
 	)
