@@ -47,7 +47,7 @@ export default function MenuVistoria() {
 	async function fetchInspections() {
 		try {
 			setIsLoaded(true)
-			const { data } = await server.get(`/agent/${user.id}/inspections`)
+			const { data } = await server.get(`/agent/${user?.id}/inspections`)
 			setInspections(data.inspections)
 			getInspections()
 		} catch (error) {
@@ -61,8 +61,8 @@ export default function MenuVistoria() {
 	async function getInspections() {
 		setIsLoaded(true)
 		try {
-			// Consulta as autuações no bando
-			const response = await getDatabaseInspections()
+			// Consulta as vistorias no banco
+			const response: any = await getDatabaseInspections()
 			setInspectionsOff(response)
 		} catch (error) {
 			setIsLoaded(false)
@@ -72,17 +72,27 @@ export default function MenuVistoria() {
 		}
 	}
 
-	// Envia a autuação pendênte
+	// Envia a vistoria pendente
 	const sendInspectionSelected = async () => {
 		setModal(MODAL.NONE)
 		setIsLoaded(true)
+		//console.log(inspectionSelected)
 
+		let newVehicle: any = {}
 		try {
 			const { data } = await server.get(`/vehicle/${inspectionSelected.vehicle}`)
+			// Buscar o veículo novo se existir
+			if (inspectionSelected.newVehicle) {
+				const result = await server.get(
+					`/vehicles/search?placa=${inspectionSelected.newVehicle}`,
+				)
+				//console.log(JSON.stringify(result.data, null, 2))
+				newVehicle = result.data.data[0]
+			}
 
-			let inspectionItems = {}
+			let inspectionItems: any = {}
 
-			inspectionSelected.items.forEach((item) => {
+			inspectionSelected.items.forEach((item: any) => {
 				inspectionItems[item.id] = {
 					item: item.item,
 					additional_info: item.additional_info,
@@ -95,7 +105,10 @@ export default function MenuVistoria() {
 			formData.append("permit_id", `${data.permit_id}`)
 			formData.append("permit_holder_id", `${data.permit_id}`)
 			formData.append("vehicle_id", `${data.vehicle_id.id}`)
-			formData.append("user_id", `${user.id}`)
+			if (inspectionSelected.newVehicle) {
+				formData.append("new_vehicle_id", `${newVehicle?.id}`)
+			}
+			formData.append("user_id", `${user?.id}`)
 			formData.append("inspection_location_id", `${inspectionSelected.inspectionLocationId}`)
 			formData.append("inspection_reason_id", `${inspectionSelected.inspectionReasonId}`)
 			formData.append("inspection_date", inspectionSelected.data)
@@ -120,7 +133,7 @@ export default function MenuVistoria() {
 			Alert.alert("Sucesso", "Vistoria enviado com sucesso!")
 			fetchInspections()
 			// Função para trazer os dados da tabela inspections
-			const response = await getDatabaseInspections()
+			const response: any = await getDatabaseInspections()
 			setInspectionsOff(response)
 		} catch (error) {
 			setIsLoaded(false)
@@ -151,7 +164,7 @@ export default function MenuVistoria() {
 			return () => {
 				setIsFocused(false) // Não está focado.
 			}
-		}, [])
+		}, []),
 	)
 
 	// Verifica a conexão

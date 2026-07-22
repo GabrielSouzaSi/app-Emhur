@@ -37,6 +37,7 @@ import { VehicleDTO } from "@/dtos/vehicleDTO"
 import { server } from "@/server/api"
 import { MaterialCommunityIcons } from "@expo/vector-icons"
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view"
+import { SafeAreaView } from "react-native-safe-area-context"
 import Toast from "react-native-toast-message"
 
 enum MODAL {
@@ -52,6 +53,7 @@ type FormData = {
 	local: string
 	infracoes: number[]
 	status: string
+	newVehicle: string
 }
 
 export default function Vistoria() {
@@ -72,8 +74,11 @@ export default function Vistoria() {
 		clearErrors,
 	} = useForm<FormData>()
 
+	const [showNewVehicle, setShowNewVehicle] = useState(false)
+
 	// Informações do Veiculo
 	const [vehicle, setVehicle] = useState<VehicleDTO>()
+	const [newVehicle, setNewVehicle] = useState<VehicleDTO>()
 	const [permitType, setPermitType] = useState<string>("")
 	// ID do alvará
 	const [alvara, setAlvara] = useState<number>()
@@ -94,6 +99,9 @@ export default function Vistoria() {
 	const [advertising, setAdvertising] = useState("")
 	// Obserções
 	const [obs, setObs] = useState("")
+
+	// Variável para identificar a troca de veículo
+	const TROCA_VEICULO_ID = 6 // exemplo
 
 	// Itens da vitoria
 	const [inspectionItems, setInspectionItems] = useState<any>([])
@@ -126,10 +134,27 @@ export default function Vistoria() {
 		}
 	}
 
+	// Buscar veículo
+	async function searchNewVehicled(req: any) {
+		Keyboard.dismiss()
+		try {
+			setIsLoaded(true)
+			const { data } = await server.get(`/vehicles/search?placa=${req}`)
+			//console.log(JSON.stringify(data, null, 2))
+
+			setNewVehicle(data.data[0])
+		} catch (error) {
+			setIsLoaded(false)
+			Alert.alert("Algo deu errado!", "Tente novamente!")
+		} finally {
+			setIsLoaded(false)
+		}
+	}
+
 	// Função para buscar a lista do motivo da vistoria
 	async function getInspectionReasons() {
 		try {
-			const data = await getDatabaseReason()
+			const data: any = await getDatabaseReason()
 			let result = data.map((data: any) => {
 				return {
 					label: data.name,
@@ -138,14 +163,14 @@ export default function Vistoria() {
 			})
 			setInspectionOptions(result)
 		} catch (error) {
-			console.log(error)
+			console.log("Error ao buscar os motivos da vistoria:", error)
 		}
 	}
 
 	// Função para buscar a lista dos locais da vistoria
 	async function getListLocations() {
 		try {
-			const data = await getDatabaseInspectionLocation()
+			const data: any = await getDatabaseInspectionLocation()
 			let result = data.map((data: any) => {
 				return {
 					label: data.name,
@@ -154,14 +179,14 @@ export default function Vistoria() {
 			})
 			setListLocations(result)
 		} catch (error) {
-			console.log(error)
+			console.log("Error ao buscar os locais da vistoria:", error)
 		}
 	}
 	// Função para listar os itens da vistoria
 	async function inspectionReasonsItems(id: number) {
 		setInspectionReason(id)
 		try {
-			const data = await getDatabaseReasonItemId(id)
+			const data: any = await getDatabaseReasonItemId(id)
 			let result = data.map((data: any) => {
 				return {
 					id: data.id,
@@ -174,7 +199,7 @@ export default function Vistoria() {
 			})
 			setInspectionItems(result)
 		} catch (error) {
-			console.log(error)
+			console.log("Error ao buscar os itens da vistoria:", error)
 		}
 	}
 
@@ -183,6 +208,16 @@ export default function Vistoria() {
 		//console.log(item);
 
 		inspectionReasonsItems(Number(item.value))
+
+		const troca = item.value === TROCA_VEICULO_ID
+
+		setShowNewVehicle(troca)
+
+		if (!troca) {
+			setNewVehicle(undefined)
+			setValue("newVehicle", "")
+			clearErrors("newVehicle")
+		}
 	}
 
 	// Função recebe os dados do local selecionado
@@ -198,13 +233,13 @@ export default function Vistoria() {
 
 	// Recebe os dados da imagem e salva no array
 	const saveImage = async (img: ImageDTO) => {
-		setImagens((prev) => [...prev, img])
+		setImagens((prev: any) => [...prev, img])
 	}
 
 	// Função para remover imagem
 	const removerImagem = (index: number) => {
-		setImagens((prev) => {
-			const updated = prev.filter((_, i) => i !== index)
+		setImagens((prev: any) => {
+			const updated = prev.filter((_: any, i: number) => i !== index)
 			if (updated.length < 1) setModal(MODAL.NONE)
 			return updated
 		})
@@ -227,11 +262,14 @@ export default function Vistoria() {
 		formData.append("permit_id", `${alvara}`)
 		formData.append("permit_holder_id", `${permitHolder?.id}`)
 		formData.append("vehicle_id", `${vehicle?.id}`)
-		formData.append("user_id", `${user.id}`)
+		formData.append("user_id", `${user?.id} `)
 		formData.append("inspection_location_id", `${locations.value}`)
 		formData.append("inspection_reason_id", `${inspectionReason}`)
 		formData.append("inspection_date", `${date}`)
 		formData.append("inspection_time", `${time}`)
+		if (showNewVehicle && newVehicle) {
+			formData.append("new_vehicle_id", `${newVehicle.id}`)
+		}
 		formData.append("advertising", `${advertising}`)
 		formData.append("final_observations", `${obs ? obs : "Sem observações"}`)
 		formData.append("inspection_items", JSON.stringify(inspectionItemsObject))
@@ -255,7 +293,7 @@ export default function Vistoria() {
 			})
 			router.back()
 		} catch (error) {
-			console.log(error)
+			console.log("Error ao enviar a vistoria:", error)
 			addInspection(data)
 		} finally {
 			setIsLoaded(false)
@@ -277,6 +315,7 @@ export default function Vistoria() {
 			{
 				permitHolderId: permitHolder?.id,
 				vehicle: form.numero,
+				newVehicle: form.newVehicle,
 				inspectionLocationId: locations.value,
 				inspectionReasonId: inspectionReason,
 				data: date,
@@ -302,7 +341,7 @@ export default function Vistoria() {
 				text1: "Algo deu errado!",
 				text2: "Não foi possível salvar!",
 			})
-			console.log(error)
+			console.log("Error ao salvar a vistoria offline:", error)
 		}
 	}
 
@@ -314,9 +353,9 @@ export default function Vistoria() {
 
 		// console.log("Checklist atualizado:", updatedData);
 
-		let inspectionItemss = {}
+		let inspectionItemss: any = {}
 
-		updatedData.forEach((item) => {
+		updatedData.forEach((item: any) => {
 			inspectionItemss[item.id] = {
 				item: item.item,
 				additional_info: item.additional_info,
@@ -404,8 +443,8 @@ export default function Vistoria() {
 								rules={{ required: "Selecione o Motivo da Vistoria!" }}
 								render={({ field: { onChange, value } }) => (
 									<DropdownButton
-										data={[...inspectionOptions].sort((a, b) =>
-											a.label.localeCompare(b.label)
+										data={[...inspectionOptions].sort((a: any, b: any) =>
+											a.label.localeCompare(b.label),
 										)}
 										placeholder="Motivo da Vistoria"
 										value={value} // ✅ agora mostra o valor selecionado
@@ -418,6 +457,107 @@ export default function Vistoria() {
 								)}
 							/>
 						</View>
+
+						{/* Consultar novo veículo */}
+						{showNewVehicle && (
+							<View className="gap-4 bg-white p-4 rounded-md border-gray-300 border-2">
+								<Text className="text-gray-500 font-regular text-2xl font-bold">
+									Informações do Novo Veículo
+								</Text>
+
+								<Controller
+									control={control}
+									name="newVehicle"
+									rules={{
+										required: showNewVehicle
+											? "Informe a placa do novo veículo!"
+											: false,
+									}}
+									render={({ field: { onChange, value } }) => (
+										<Search
+											errorMessage={errors.newVehicle?.message}
+											placeholder="Placa do Novo Veículo"
+											onChangeText={onChange}
+											value={value}
+											onSubmitEditing={() => searchNewVehicled(value)}
+											onSearch={() => searchNewVehicled(value)}
+											returnKeyType="send"
+										/>
+									)}
+								/>
+
+								<Holder vehicle={newVehicle} />
+							</View>
+						)}
+
+						{/* {showNewVehicle && (
+							<>
+								{newVehicle?.id && (
+									<>
+										<View className="flex">
+											<Text className="text-gray-500 font-regular text-2xl font-bold">
+												Frente:
+											</Text>
+											<View className="flex flex-row justify-between my-4">
+												<View className="flex-1 mr-2">
+													<CameraSave />
+												</View>
+												<View className="flex-1 ml-2">
+													<GalleryPick />
+												</View>
+											</View>
+
+										</View>
+
+										<View className="flex">
+											<Text className="text-gray-500 font-regular text-2xl font-bold">
+												Traseira:
+											</Text>
+											<View className="flex flex-row justify-between my-4">
+												<View className="flex-1 mr-2">
+													<CameraSave />
+												</View>
+												<View className="flex-1 ml-2">
+													<GalleryPick />
+												</View>
+											</View>
+
+											
+										</View>
+
+										<View className="flex">
+											<Text className="text-gray-500 font-regular text-2xl font-bold">
+												Lateral direita:
+											</Text>
+											<View className="flex flex-row justify-between my-4">
+												<View className="flex-1 mr-2">
+													<CameraSave />
+												</View>
+												<View className="flex-1 ml-2">
+													<GalleryPick />
+												</View>
+											</View>
+
+										</View>
+
+										<View className="flex">
+											<Text className="text-gray-500 font-regular text-2xl font-bold">
+												Lateral esquerda:
+											</Text>
+											<View className="flex flex-row justify-between my-4">
+												<View className="flex-1 mr-2">
+													<CameraSave />
+												</View>
+												<View className="flex-1 ml-2">
+													<GalleryPick />
+												</View>
+											</View>
+										</View>
+									</>
+								)}
+							</>
+						)} */}
+
 						<View>
 							<Text className="text-gray-500 font-regular text-2xl font-bold">
 								Local da Vistoria
@@ -428,8 +568,8 @@ export default function Vistoria() {
 								rules={{ required: "Selecione o Local da Vistoria!" }}
 								render={({ field: { onChange, value } }) => (
 									<DropdownButton
-										data={[...listLocations].sort((a, b) =>
-											a.label.localeCompare(b.label)
+										data={[...listLocations].sort((a: any, b: any) =>
+											a.label.localeCompare(b.label),
 										)}
 										placeholder="Local da Vistoria"
 										value={value} // ✅ agora mostra o valor selecionado
@@ -522,13 +662,14 @@ export default function Vistoria() {
 						<Button.TextButton title="ENVIAR" />
 					</Button>
 				</View>
-
-				<Modal
-					visible={modal === MODAL.IMAGENS}
-					animationType="slide"
-					onRequestClose={() => setModal(MODAL.NONE)}
-				>
-					<View className="flex-1 bg-white p-4">
+			</KeyboardAwareScrollView>
+			<Modal
+				visible={modal === MODAL.IMAGENS}
+				animationType="slide"
+				onRequestClose={() => setModal(MODAL.NONE)}
+			>
+				<SafeAreaView className="flex-1 bg-white" edges={["top", "bottom"]}>
+					<View className="flex-1 p-4">
 						<TouchableOpacity
 							activeOpacity={0.7}
 							className="self-end mb-4"
@@ -565,18 +706,20 @@ export default function Vistoria() {
 							showsVerticalScrollIndicator={false}
 						/>
 					</View>
-				</Modal>
-				<Modal
-					visible={modal === MODAL.VISTORIA}
-					animationType="slide"
-					onRequestClose={() => setModal(MODAL.NONE)}
-				>
-					<View className="flex-1  bg-white p-4">
+				</SafeAreaView>
+			</Modal>
+			<Modal
+				visible={modal === MODAL.VISTORIA}
+				animationType="slide"
+				onRequestClose={() => setModal(MODAL.NONE)}
+			>
+				<SafeAreaView className="flex-1 bg-white" edges={["top", "bottom"]}>
+					<View className="flex-1 p-4">
 						<View className="flex-row justify-between items-center">
-							<Text className="font-semiBold text-xl">Lista de Items</Text>
+							<Text className="font-semiBold text-xl">Lista de Itens</Text>
+
 							<TouchableOpacity
 								activeOpacity={0.7}
-								className="self-end mb-4"
 								onPress={() => setModal(MODAL.NONE)}
 							>
 								<MaterialCommunityIcons
@@ -586,12 +729,13 @@ export default function Vistoria() {
 								/>
 							</TouchableOpacity>
 						</View>
+
 						{inspectionItems && (
 							<InspectionItem data={inspectionItems} onSave={handleSave} />
 						)}
 					</View>
-				</Modal>
-			</KeyboardAwareScrollView>
+				</SafeAreaView>
+			</Modal>
 			{isLoaded && <Loading />}
 		</>
 	)
