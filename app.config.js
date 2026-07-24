@@ -83,6 +83,14 @@ export default () => ({
 					initialOrientation: "DEFAULT",
 				},
 			],
+			[
+				"expo-secure-store",
+				{
+					configureAndroidBackup: true,
+					faceIDPermission:
+						"Allow $(PRODUCT_NAME) to access your Face ID biometric data.",
+				},
+			],
 		],
 		extra: {
 			eas: {
