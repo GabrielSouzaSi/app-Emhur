@@ -15,6 +15,7 @@ import {
 	Pressable,
 	ScrollView,
 	Text,
+	Vibration,
 	View,
 } from "react-native"
 import { captureRef } from "react-native-view-shot"
@@ -319,6 +320,20 @@ export default function FundiaryInspectionForm() {
 	}
 
 	// GPS
+	async function triggerGPSHaptic() {
+		try {
+			if (Platform.OS === "android") {
+				Vibration.vibrate(300)
+				return
+			}
+
+			await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
+		} catch (error) {
+			// O feedback tátil não deve impedir a captura do GPS.
+			console.log("Feedback tátil indisponível:", error)
+		}
+	}
+
 	async function getGPS() {
 		if (isGettingGPS) return
 
@@ -1030,8 +1045,8 @@ export default function FundiaryInspectionForm() {
 								className="mb-4 w-full items-center justify-center p-4 rounded-md bg-blue-500 active:opacity-60"
 								disabled={isGettingGPS}
 								onPress={() => {
-									getGPS()
-									Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
+									void triggerGPSHaptic()
+									void getGPS()
 								}}
 							>
 								<Button.TextButton
