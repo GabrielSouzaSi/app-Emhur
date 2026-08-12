@@ -111,7 +111,7 @@ export default function Escala() {
 		setIsLoaded(true)
 		try {
 			const { data } = await server.get(
-				`/schedules/user/${user.id}?start_date=${firstDate}&end_date=${lastDate}`
+				`/schedules/user/${user.id}?start_date=${firstDate}&end_date=${lastDate}`,
 			)
 			setMarkedDates(transformData(data))
 		} catch (error: any) {
@@ -168,7 +168,7 @@ export default function Escala() {
 
 	return (
 		<View className="flex-1">
-			<HeaderBack title="Credencial" variant="primary" />
+			<HeaderBack title="Escala" variant="primary" />
 
 			<ScrollView
 				showsVerticalScrollIndicator={false}
