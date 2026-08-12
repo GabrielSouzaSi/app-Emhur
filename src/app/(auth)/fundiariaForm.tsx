@@ -81,6 +81,7 @@ type FundiaryInspectionForm = {
 
 export default function FundiaryInspectionForm() {
 	const [isLoaded, setIsLoaded] = useState(false)
+	const [isGettingGPS, setIsGettingGPS] = useState(false)
 	const router = useRouter()
 
 	const scrollRef = useRef<ScrollView>(null)
@@ -319,19 +320,33 @@ export default function FundiaryInspectionForm() {
 
 	// GPS
 	async function getGPS() {
-		const status = await statusGPS()
+		if (isGettingGPS) return
 
-		if (!status?.coords) return
+		setIsGettingGPS(true)
 
-		setValue("latitude", String(status.coords.latitude), {
-			shouldDirty: true,
-			shouldValidate: true,
-		})
+		try {
+			const location = await statusGPS()
 
-		setValue("longitude", String(status.coords.longitude), {
-			shouldDirty: true,
-			shouldValidate: true,
-		})
+			if (!location?.coords) return
+
+			setValue("latitude", String(location.coords.latitude), {
+				shouldDirty: true,
+				shouldValidate: true,
+			})
+
+			setValue("longitude", String(location.coords.longitude), {
+				shouldDirty: true,
+				shouldValidate: true,
+			})
+		} catch (error) {
+			console.log("Erro ao capturar GPS:", error)
+			Alert.alert(
+				"Não foi possível obter a localização",
+				"Vá para uma área aberta, mantenha o GPS ativado e tente novamente.",
+			)
+		} finally {
+			setIsGettingGPS(false)
+		}
 	}
 
 	function buildLocalPayload(form: FormData, data: FundiaryInspectionForm) {
@@ -507,20 +522,21 @@ export default function FundiaryInspectionForm() {
 	}
 
 	// Permissões GPS
-	async function getPermissionGPS() {
+	async function getPermissionGPS(): Promise<boolean> {
 		const { status } = await Location.requestForegroundPermissionsAsync()
 
 		if (status !== "granted") {
-			Alert.alert("Permissão negada", "Dê permissão da localização para continuar.", [
-				{ text: "OK", onPress: () => getPermissionGPS() },
-			])
-			return
-		} else {
-			await statusGPS()
+			Alert.alert("Permissão negada", "Dê permissão da localização para continuar.")
+			return false
 		}
+
+		return true
 	}
 
 	async function statusGPS(): Promise<Location.LocationObject | null> {
+		const hasPermission = await getPermissionGPS()
+		if (!hasPermission) return null
+
 		const isGPSEnabled = await Location.hasServicesEnabledAsync()
 
 		if (!isGPSEnabled) {
@@ -528,9 +544,26 @@ export default function FundiaryInspectionForm() {
 			return null
 		}
 
-		return await Location.getCurrentPositionAsync({
-			accuracy: Location.Accuracy.High,
-		})
+		try {
+			return await Promise.race([
+				Location.getCurrentPositionAsync({
+					accuracy: Location.Accuracy.High,
+				}),
+				new Promise<never>((_, reject) =>
+					setTimeout(() => reject(new Error("Tempo limite do GPS excedido")), 30000),
+				),
+			])
+		} catch (error) {
+			// Sem internet, uma primeira leitura do GPS pode demorar. Nesse caso,
+			// aproveita somente uma posição recente e com precisão aceitável.
+			const lastKnown = await Location.getLastKnownPositionAsync({
+				maxAge: 5 * 60 * 1000,
+				requiredAccuracy: 100,
+			})
+
+			if (lastKnown) return lastKnown
+			throw error
+		}
 	}
 
 	const handlePrintAndShare = useCallback(async () => {
@@ -551,7 +584,6 @@ export default function FundiaryInspectionForm() {
 	}, [])
 
 	useEffect(() => {
-		getPermissionGPS()
 		getTableFundiaryOccupationType()
 		getTableFundiaryUseType()
 		getTableFundiaryEnvironmentalInfluenceType()
@@ -996,13 +1028,20 @@ export default function FundiaryInspectionForm() {
 
 							<Pressable
 								className="mb-4 w-full items-center justify-center p-4 rounded-md bg-blue-500 active:opacity-60"
-								onLongPress={() => {
+								disabled={isGettingGPS}
+								onPress={() => {
 									getGPS()
 									Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)
 								}}
 							>
 								<Button.TextButton
-									title={latitude ? "Atualizar Posição" : "Marcar Posição"}
+									title={
+										isGettingGPS
+											? "Obtendo GPS..."
+											: latitude
+												? "Atualizar Posição"
+												: "Marcar Posição"
+									}
 								/>
 							</Pressable>
 
