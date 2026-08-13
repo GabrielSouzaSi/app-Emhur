@@ -15,7 +15,8 @@ type HeaderMenuProps = {
 export function HeaderMenu({ onUpdate, onCheckUpdate }: HeaderMenuProps) {
 	const router = useRouter()
 	const [isDropdownVisible, setIsDropdownVisible] = useState(false)
-	const { signOut } = useAuth()
+	const { can, signOut } = useAuth()
+	const canAccessSchedule = can.hasTeam("DFT")
 
 	function handleSignOut() {
 		signOut()
@@ -69,17 +70,19 @@ export function HeaderMenu({ onUpdate, onCheckUpdate }: HeaderMenuProps) {
 								Perfil
 							</Text>
 						</Pressable>
-						<Pressable
-							onPress={() => {
-								setIsDropdownVisible(false)
-								router.push("/(auth)/escala")
-							}}
-							className="px-4 py-3 border-b border-zinc-100"
-						>
-							<Text className="font-regular font-bold text-base text-blue-500">
-								Escala
-							</Text>
-						</Pressable>
+						{canAccessSchedule && (
+							<Pressable
+								onPress={() => {
+									setIsDropdownVisible(false)
+									router.push("/(auth)/escala")
+								}}
+								className="px-4 py-3 border-b border-zinc-100"
+							>
+								<Text className="font-regular font-bold text-base text-blue-500">
+									Escala
+								</Text>
+							</Pressable>
+						)}
 						<Pressable
 							onPress={() => {
 								setIsDropdownVisible(false)

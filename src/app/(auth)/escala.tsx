@@ -4,6 +4,7 @@ import { Loading } from "@/components/loading"
 import { Modal } from "@/components/modal"
 import { useAuth } from "@/hooks/useAuth"
 import { server } from "@/server/api"
+import { Redirect } from "expo-router"
 import { useEffect, useState } from "react"
 import { Alert, FlatList, ScrollView, Text, View } from "react-native"
 
@@ -54,7 +55,8 @@ interface ScheduleItem {
 }
 
 export default function Escala() {
-	const { user } = useAuth()
+	const { can, user } = useAuth()
+	const canAccessSchedule = can.hasAnyTeam(["GFF", "FF"])
 	const [isLoaded, setIsLoaded] = useState(false)
 	const [markedDates, setMarkedDates] = useState<any>()
 	const [selectedDay, setSelectedDay] = useState<ScheduleItem>()
@@ -111,7 +113,7 @@ export default function Escala() {
 		setIsLoaded(true)
 		try {
 			const { data } = await server.get(
-				`/schedules/user/${user.id}?start_date=${firstDate}&end_date=${lastDate}`,
+				`/schedules/user/${user?.id}?start_date=${firstDate}&end_date=${lastDate}`,
 			)
 			setMarkedDates(transformData(data))
 		} catch (error: any) {
@@ -127,7 +129,7 @@ export default function Escala() {
 	async function onDayPress(day: any) {
 		setIsLoaded(true)
 		try {
-			const { data } = await server.get(`/schedules/user/${user.id}/date/${day.dateString}`)
+			const { data } = await server.get(`/schedules/user/${user?.id}/date/${day.dateString}`)
 			setSelectedDay(data)
 			setIsVisible(true)
 		} catch (error: any) {
@@ -161,10 +163,14 @@ export default function Escala() {
 
 	// Busca os dados sempre que as datas forem atualizadas
 	useEffect(() => {
-		if (firstDate && lastDate) {
+		if (canAccessSchedule && firstDate && lastDate) {
 			getListDates()
 		}
-	}, [firstDate, lastDate])
+	}, [canAccessSchedule, firstDate, lastDate])
+
+	if (!canAccessSchedule) {
+		return <Redirect href="/(auth)" />
+	}
 
 	return (
 		<View className="flex-1">
