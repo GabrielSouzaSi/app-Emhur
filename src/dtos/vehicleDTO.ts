@@ -5,6 +5,6 @@ export type VehicleDTO = {
   model: string;
   color: string;
   year: number;
-  renavam: string;
+  renavam: string | null;
   chassi: string;
 }

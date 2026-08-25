@@ -2,11 +2,11 @@ export type PermitHolderDTO = {
   id: number;
   name: string;
   data_nascimento: string;
-  cpf: string;
+  cpf: string | null;
   rg: string;
   fone: string;
   celular: string;
-  cnh: string;
+  cnh: string | null;
   categoria: string;
   validade_cnh: string;
   numero: string;

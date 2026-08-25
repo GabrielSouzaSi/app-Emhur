@@ -33,14 +33,16 @@ export default function Veiculo() {
   // Buscar veículo
   async function searchPlate(req: any) {
     Keyboard.dismiss();
+    setVehicle(undefined);
+    setPermitHolder(undefined);
     try {
       setIsLoaded(true);
       const { data } = await server.get(`/vehicle/${req}`);
       console.log(data);
 
-      const { permit_holder_id, vehicle_id } = data;
-      setVehicle(vehicle_id);
-      setPermitHolder(permit_holder_id);
+      const { permit_holder_id, vehicle_id } = data ?? {};
+      setVehicle(vehicle_id ?? undefined);
+      setPermitHolder(permit_holder_id ?? undefined);
     } catch (error) {
       throw error;
     } finally {

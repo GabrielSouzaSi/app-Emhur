@@ -148,13 +148,16 @@ export default function Autuacaoes() {
 	// Busca as informações do veículo
 	async function searchPlate(req: any) {
 		Keyboard.dismiss()
+		setVehicle(undefined)
+		setPermitHolder(undefined)
+		setPermitType("")
 		try {
 			setIsLoaded(true)
 			const { data } = await server.get(`/vehicle/${req}`)
-			const { permit_holder_id, vehicle_id } = data
-			setVehicle(vehicle_id)
-			setPermitHolder(permit_holder_id)
-			setPermitType(data.permit_type.id.toString())
+			const { permit_holder_id, vehicle_id } = data ?? {}
+			setVehicle(vehicle_id ?? undefined)
+			setPermitHolder(permit_holder_id ?? undefined)
+			setPermitType(data?.permit_type?.id?.toString() ?? "")
 			//console.log(JSON.stringify(data, null, 2))
 		} catch (error) {
 			Toast.show({

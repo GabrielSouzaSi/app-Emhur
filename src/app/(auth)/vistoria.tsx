@@ -116,16 +116,20 @@ export default function Vistoria() {
 	// Buscar veículo
 	async function searchPlate(req: any) {
 		Keyboard.dismiss()
+		setVehicle(undefined)
+		setPermitHolder(undefined)
+		setPermitType("")
+		setAlvara(undefined)
 		try {
 			setIsLoaded(true)
 			const { data } = await server.get(`/vehicle/${req}`)
 			// console.log(JSON.stringify(data, null, 2));
 
-			const { permit_holder_id, vehicle_id } = data
-			setAlvara(data.permit_id)
-			setVehicle(vehicle_id)
-			setPermitHolder(permit_holder_id)
-			setPermitType(data.permit_type.name)
+			const { permit_holder_id, vehicle_id } = data ?? {}
+			setAlvara(data?.permit_id)
+			setVehicle(vehicle_id ?? undefined)
+			setPermitHolder(permit_holder_id ?? undefined)
+			setPermitType(data?.permit_type?.name ?? "")
 		} catch (error) {
 			setIsLoaded(false)
 			Alert.alert("Algo deu errado!", "Tente novamente!")

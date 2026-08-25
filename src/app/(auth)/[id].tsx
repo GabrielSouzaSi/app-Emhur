@@ -7,6 +7,7 @@ import { HeaderBack } from "@/components/headerBack"
 import { Holder } from "@/components/Holder"
 import { LoadingLight, LoadingTop } from "@/components/loading"
 import { server } from "@/server/api"
+import { maskDocument } from "@/utils/displayValue"
 
 type ViolationCode = {
 	code: string
@@ -126,7 +127,7 @@ export default function IdAutuacao() {
 											</Text>
 											<View className="bg-gray-300 rounded-md p-3">
 												<Text className="font-semiBold text-lg">
-													{permitHolder?.driver_cpf.slice(0, 3)}*****
+											{maskDocument(permitHolder?.driver_cpf)}
 												</Text>
 											</View>
 										</View>
@@ -136,7 +137,7 @@ export default function IdAutuacao() {
 											</Text>
 											<View className="bg-gray-300 rounded-md p-3">
 												<Text className="font-semiBold text-lg">
-													{permitHolder?.driver_cnh.slice(0, 3)}*****
+											{maskDocument(permitHolder?.driver_cnh)}
 												</Text>
 											</View>
 										</View>

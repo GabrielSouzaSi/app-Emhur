@@ -1,5 +1,7 @@
 import { Image, Text, View } from "react-native"
 
+import { maskDocument } from "@/utils/displayValue"
+
 type HolderAndVehicle = {
 	permitHolder?: any
 	vehicle?: any
@@ -71,7 +73,7 @@ export function Holder({ permitHolder, vehicle }: HolderAndVehicle) {
 								</Text>
 								<View className="bg-gray-300 rounded-md p-3">
 									<Text className="font-semiBold text-lg">
-										{vehicle.renavam.slice(0, 3)}*****
+										{maskDocument(vehicle.renavam)}
 									</Text>
 								</View>
 							</View>
@@ -107,7 +109,7 @@ export function Holder({ permitHolder, vehicle }: HolderAndVehicle) {
 								</Text>
 								<View className="bg-gray-300 rounded-md p-3">
 									<Text className="font-semiBold text-lg">
-										{permitHolder.cpf.slice(0, 3)}*****
+										{maskDocument(permitHolder.cpf)}
 									</Text>
 								</View>
 							</View>
@@ -117,7 +119,7 @@ export function Holder({ permitHolder, vehicle }: HolderAndVehicle) {
 								</Text>
 								<View className="bg-gray-300 rounded-md p-3">
 									<Text className="font-semiBold text-lg">
-										{permitHolder.cnh.slice(0, 3)}*****
+										{maskDocument(permitHolder.cnh)}
 									</Text>
 								</View>
 							</View>
