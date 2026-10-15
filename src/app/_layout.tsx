@@ -71,7 +71,7 @@ function StackLayout() {
 	}, [])
 
 	// Durante o boot inicial, deixe o Splash cuidar da tela
-	if (!nav?.key || isBootstrapping) return null
+	if (!nav?.key || isBootstrapping || !success) return null
 
 	const isLoggedIn = !!user?.id
 
