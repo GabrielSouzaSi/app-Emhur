@@ -50,6 +50,13 @@
       "when": 1783275896825,
       "tag": "0006_spooky_longshot",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788936322563,
+      "tag": "0007_compact_inspections",
+      "breakpoints": true
     }
   ]
 }
