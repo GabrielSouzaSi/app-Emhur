@@ -72,6 +72,7 @@ export default function Vistoria() {
 		getValues,
 		setValue,
 		clearErrors,
+		setError,
 	} = useForm<FormData>()
 
 	const [showNewVehicle, setShowNewVehicle] = useState(false)
@@ -101,7 +102,7 @@ export default function Vistoria() {
 	const [obs, setObs] = useState("")
 
 	// Variável para identificar a troca de veículo
-	const TROCA_VEICULO_ID = 6 // exemplo
+	const TROCA_VEICULO_IDS = [6, 7, 8]
 
 	// Itens da vitoria
 	const [inspectionItems, setInspectionItems] = useState<any>([])
@@ -141,12 +142,27 @@ export default function Vistoria() {
 	// Buscar veículo
 	async function searchNewVehicled(req: any) {
 		Keyboard.dismiss()
+		setNewVehicle(undefined)
 		try {
 			setIsLoaded(true)
 			const { data } = await server.get(`/vehicles/search?placa=${req}`)
 			//console.log(JSON.stringify(data, null, 2))
 
-			setNewVehicle(data.data[0])
+			const plate = String(req ?? "").trim().toUpperCase()
+			if (getValues("newVehicle")?.trim().toUpperCase() !== plate) return
+			const foundVehicle = (data.data as VehicleDTO[]).find(
+				(item) => item.plate_number?.trim().toUpperCase() === plate,
+			)
+			if (!foundVehicle) {
+				Alert.alert(
+					"Veículo não encontrado",
+					"Confira a placa novamente ou o veículo ainda não foi cadastrado.",
+				)
+				return
+			}
+
+			setNewVehicle(foundVehicle)
+			clearErrors("newVehicle")
 		} catch (error) {
 			setIsLoaded(false)
 			Alert.alert("Algo deu errado!", "Tente novamente!")
@@ -213,7 +229,7 @@ export default function Vistoria() {
 
 		inspectionReasonsItems(Number(item.value))
 
-		const troca = item.value === TROCA_VEICULO_ID
+		const troca = TROCA_VEICULO_IDS.includes(Number(item.value))
 
 		setShowNewVehicle(troca)
 
@@ -249,8 +265,49 @@ export default function Vistoria() {
 		})
 	}
 
+	function validateNewVehicle(value: string | undefined) {
+		if (!showNewVehicle && !TROCA_VEICULO_IDS.includes(Number(inspectionReason)) &&
+			!TROCA_VEICULO_IDS.includes(Number(getValues("vistoria")))) return true
+		const plate = value?.trim().toUpperCase()
+		if (!plate) return "Informe a placa do novo veículo!"
+		return true
+	}
+
 	async function postInspection(data: FormData) {
+		const validation = validateNewVehicle(data.newVehicle)
+		if (validation !== true) {
+			setError("newVehicle", { type: "validate", message: validation })
+			return
+		}
 		setIsLoaded(true)
+		if (!isConnect) {
+			try {
+				await addInspection(data)
+			} finally {
+				setIsLoaded(false)
+			}
+			return
+		}
+		let confirmedNewVehicle = newVehicle
+		if (showNewVehicle || TROCA_VEICULO_IDS.includes(Number(inspectionReason)) ||
+			TROCA_VEICULO_IDS.includes(Number(data.vistoria))) {
+			try {
+				const plate = data.newVehicle?.trim().toUpperCase()
+				const response = await server.get("/vehicles/search", { params: { placa: plate } })
+				confirmedNewVehicle = (response.data.data as VehicleDTO[]).find(
+					(item) => item.id && item.plate_number?.trim().toUpperCase() === plate,
+				)
+				if (!confirmedNewVehicle) throw new Error("Veículo não encontrado. Confira a placa informada ou verifique se o veículo já foi cadastrado.")
+			} catch (error) {
+				setNewVehicle(undefined)
+				try {
+					await addInspection(data)
+				} finally {
+					setIsLoaded(false)
+				}
+				return
+			}
+		}
 		let currentdate = new Date()
 		let date =
 			+currentdate.getFullYear() +
@@ -271,8 +328,8 @@ export default function Vistoria() {
 		formData.append("inspection_reason_id", `${inspectionReason}`)
 		formData.append("inspection_date", `${date}`)
 		formData.append("inspection_time", `${time}`)
-		if (showNewVehicle && newVehicle) {
-			formData.append("new_vehicle_id", `${newVehicle.id}`)
+		if (confirmedNewVehicle) {
+			formData.append("new_vehicle_id", `${confirmedNewVehicle.id}`)
 		}
 		formData.append("advertising", `${advertising}`)
 		formData.append("final_observations", `${obs ? obs : "Sem observações"}`)
@@ -298,7 +355,7 @@ export default function Vistoria() {
 			router.back()
 		} catch (error) {
 			console.log("Error ao enviar a vistoria:", error)
-			addInspection(data)
+			await addInspection(data)
 		} finally {
 			setIsLoaded(false)
 		}
@@ -315,11 +372,16 @@ export default function Vistoria() {
 		let time =
 			currentdate.getHours() + ":" + currentdate.getMinutes() + ":" + currentdate.getSeconds()
 
-		let inspection = [
-			{
+		if (!user) {
+			throw new Error("Usuário não autenticado")
+		}
+
+		const inspection = {
+			userId: user.id,
+			inspection: {
 				permitHolderId: permitHolder?.id,
 				vehicle: form.numero,
-				newVehicle: form.newVehicle,
+				newVehicle: form.newVehicle?.trim().toUpperCase(),
 				inspectionLocationId: locations.value,
 				inspectionReasonId: inspectionReason,
 				data: date,
@@ -330,10 +392,13 @@ export default function Vistoria() {
 				imagens: imagens,
 				status: `${status.value}`,
 			},
-		]
+		}
 
 		try {
-			await addDatabaseInspection(inspection)
+			const saved = await addDatabaseInspection(inspection)
+			if (!saved) {
+				throw new Error("Não foi possível salvar a vistoria no banco local")
+			}
 			Toast.show({
 				type: "success",
 				text1: "Vistoria salvo offline!",
@@ -405,12 +470,13 @@ export default function Vistoria() {
 								render={({ field: { onChange, value } }) => (
 									<Search
 										errorMessage={errors.numero?.message}
-										placeholder="Número do Veículo"
+										placeholder="Número ou Placa do Veículo"
 										onChangeText={onChange}
 										value={value}
 										onSubmitEditing={() => searchPlate(value)}
 										returnKeyType="send"
-										keyboardType="numeric"
+										keyboardType="default"
+										autoCapitalize="characters"
 										onSearch={() => searchPlate(value)}
 									/>
 								)}
@@ -473,16 +539,19 @@ export default function Vistoria() {
 									control={control}
 									name="newVehicle"
 									rules={{
-										required: showNewVehicle
-											? "Informe a placa do novo veículo!"
-											: false,
+										validate: validateNewVehicle,
 									}}
 									render={({ field: { onChange, value } }) => (
 										<Search
 											errorMessage={errors.newVehicle?.message}
 											placeholder="Placa do Novo Veículo"
-											onChangeText={onChange}
+											onChangeText={(text) => {
+												setNewVehicle(undefined)
+												onChange(text.toUpperCase())
+											}}
 											value={value}
+											keyboardType="default"
+											autoCapitalize="characters"
 											onSubmitEditing={() => searchNewVehicled(value)}
 											onSearch={() => searchNewVehicled(value)}
 											returnKeyType="send"
