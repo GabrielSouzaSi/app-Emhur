@@ -1,3 +1,5 @@
+import axios from "axios"
+import * as FileSystem from "expo-file-system/legacy"
 import { useFocusEffect, useRouter } from "expo-router"
 import { useCallback, useContext, useEffect, useState } from "react"
 import { Alert, Text, View } from "react-native"
@@ -6,7 +8,11 @@ import { NetworkContext } from "@/contexts/NetworkContext"
 import { useAuth } from "@/hooks/useAuth"
 import { server } from "@/server/api"
 
-import { delDatabaseInspectionId, getDatabaseInspections } from "@/database/inspection"
+import {
+	delDatabaseInspectionId,
+	getDatabaseInspections,
+	type DatabaseInspection,
+} from "@/database/inspection"
 
 import { Button } from "@/components/button"
 import DataTable from "@/components/dataTable"
@@ -28,8 +34,9 @@ export default function MenuVistoria() {
 	const [modal, setModal] = useState(MODAL.NONE)
 	const { user } = useAuth()
 	const [inspections, setInspections] = useState<any>()
-	const [inspectionsOff, setInspectionsOff] = useState([])
-	const [inspectionSelected, setInspectionSelected] = useState<any>()
+	const [inspectionsOff, setInspectionsOff] = useState<DatabaseInspection[]>([])
+	const [inspectionSelected, setInspectionSelected] = useState<DatabaseInspection>()
+	const [isSubmitting, setIsSubmitting] = useState(false)
 
 	const router = useRouter()
 
@@ -38,8 +45,11 @@ export default function MenuVistoria() {
 	}
 
 	// Abre o modal para exibir as opções da autuação selecionada
-	const handleOption = (item: any) => {
-		setInspectionSelected(item)
+	const handleOption = (item: { id: number }) => {
+		const selected = inspectionsOff.find((inspection) => inspection.id === item.id)
+		if (!selected) return
+
+		setInspectionSelected(selected)
 		setModal(MODAL.OPTIONS)
 	}
 
@@ -62,7 +72,7 @@ export default function MenuVistoria() {
 		setIsLoaded(true)
 		try {
 			// Consulta as vistorias no banco
-			const response: any = await getDatabaseInspections()
+			const response = await getDatabaseInspections()
 			setInspectionsOff(response)
 		} catch (error) {
 			setIsLoaded(false)
@@ -72,78 +82,171 @@ export default function MenuVistoria() {
 		}
 	}
 
+	// Monta o mesmo payload para envio e reporte da vistoria pendente
+	const buildInspectionPayload = async (inspection: DatabaseInspection["inspection"]) => {
+		let newVehicle: any = {}
+		const { data } = await server.get(`/vehicle/${inspection.vehicle}`)
+		const permitHolderId = inspection.permitHolderId ?? data.permit_holder_id?.id
+
+		if (!permitHolderId) {
+			throw new Error("Responsável pelo alvará não encontrado")
+		}
+
+		const requiresNewVehicle = [6, 7, 8].includes(Number(inspection.inspectionReasonId))
+		const plate = inspection.newVehicle?.trim().toUpperCase()
+		if (requiresNewVehicle && !plate) {
+			throw new Error("Informe a placa do novo veículo antes de enviar a vistoria.")
+		}
+		if (plate) {
+			const result = await server.get("/vehicles/search", { params: { placa: plate } })
+			newVehicle = result.data.data.find(
+				(item: any) => item.id && item.plate_number?.trim().toUpperCase() === plate,
+			)
+			if (!newVehicle) {
+				throw new Error("Veículo não encontrado. Confira a placa informada ou verifique se o veículo já foi cadastrado.")
+			}
+		}
+
+		let inspectionItems: any = {}
+
+		inspection.items.forEach((item) => {
+			inspectionItems[item.id] = {
+				item: item.item,
+				additional_info: item.additional_info,
+				status: item.status,
+				exists: item.exists,
+			}
+		})
+
+		const payload = {
+			permit_id: `${data.permit_id}`,
+			permit_holder_id: `${permitHolderId}`,
+			vehicle_id: `${data.vehicle_id.id}`,
+			...(inspection.newVehicle && { new_vehicle_id: `${newVehicle?.id}` }),
+			user_id: `${user?.id}`,
+			inspection_location_id: `${inspection.inspectionLocationId}`,
+			inspection_reason_id: `${inspection.inspectionReasonId}`,
+			inspection_date: inspection.data,
+			inspection_time: inspection.hora,
+			advertising: inspection.advertising,
+			final_observations: inspection.obs,
+			inspection_items: JSON.stringify(inspectionItems),
+			inspection_result: inspection.status,
+		}
+		const formData = new FormData()
+		Object.entries(payload).forEach(([key, value]) => formData.append(key, value))
+		inspection.imagens.forEach((image: ImageDTO) => {
+			formData.append("attachments[]", {
+				...image,
+				uri: image.uri,
+				name: image.name,
+				type: image.type,
+			} as any)
+		})
+
+		return { formData, payload }
+	}
+
 	// Envia a vistoria pendente
 	const sendInspectionSelected = async () => {
+		if (!inspectionSelected || isSubmitting) return
+
 		setModal(MODAL.NONE)
+		setIsSubmitting(true)
 		setIsLoaded(true)
-		//console.log(inspectionSelected)
-
-		let newVehicle: any = {}
+		const { id, inspection } = inspectionSelected
 		try {
-			const { data } = await server.get(`/vehicle/${inspectionSelected.vehicle}`)
-			// Buscar o veículo novo se existir
-			if (inspectionSelected.newVehicle) {
-				const result = await server.get(
-					`/vehicles/search?placa=${inspectionSelected.newVehicle}`,
-				)
-				//console.log(JSON.stringify(result.data, null, 2))
-				newVehicle = result.data.data[0]
-			}
-
-			let inspectionItems: any = {}
-
-			inspectionSelected.items.forEach((item: any) => {
-				inspectionItems[item.id] = {
-					item: item.item,
-					additional_info: item.additional_info,
-					status: item.status,
-					exists: item.exists,
-				}
-			})
-
-			let formData = new FormData()
-			formData.append("permit_id", `${data.permit_id}`)
-			formData.append("permit_holder_id", `${data.permit_id}`)
-			formData.append("vehicle_id", `${data.vehicle_id.id}`)
-			if (inspectionSelected.newVehicle) {
-				formData.append("new_vehicle_id", `${newVehicle?.id}`)
-			}
-			formData.append("user_id", `${user?.id}`)
-			formData.append("inspection_location_id", `${inspectionSelected.inspectionLocationId}`)
-			formData.append("inspection_reason_id", `${inspectionSelected.inspectionReasonId}`)
-			formData.append("inspection_date", inspectionSelected.data)
-			formData.append("inspection_time", inspectionSelected.hora)
-			formData.append("advertising", inspectionSelected.advertising)
-			formData.append("final_observations", inspectionSelected.obs)
-			formData.append("inspection_items", JSON.stringify(inspectionItems))
-			formData.append("inspection_result", inspectionSelected.status)
-			inspectionSelected.imagens.forEach((image: ImageDTO) => {
-				formData.append("attachments[]", {
-					...image,
-					uri: image.uri,
-					name: image.name,
-					type: image.type,
-				} as any)
-			})
-
-			console.log("Checklist salvo", JSON.stringify(formData, null, 2))
-
+			const { formData } = await buildInspectionPayload(inspection)
 			await server.postForm(`/inspections`, formData)
-			await delDatabaseInspectionId(inspectionSelected.id)
+			await delDatabaseInspectionId(id)
 			Alert.alert("Sucesso", "Vistoria enviado com sucesso!")
 			fetchInspections()
 			// Função para trazer os dados da tabela inspections
-			const response: any = await getDatabaseInspections()
+			const response = await getDatabaseInspections()
 			setInspectionsOff(response)
-		} catch (error) {
+		} catch (error: any) {
 			setIsLoaded(false)
-			Alert.alert("Algo deu errado!", "Tente novamente!")
+			const message = error?.response?.data?.message ?? error?.message ?? "Tente novamente!"
+			console.error("sendInspectionSelected error =>", error?.response?.data ?? error)
+			Alert.alert("Algo deu errado!", message)
 		} finally {
 			setIsLoaded(false)
+			setIsSubmitting(false)
+		}
+	}
+
+	const reportInspectionSelected = async () => {
+		if (!inspectionSelected || isSubmitting) return
+
+		setIsSubmitting(true)
+		setIsLoaded(true)
+		try {
+			const { inspection } = inspectionSelected
+			// O reporte deve incluir os dados locais mesmo sem cadastro na API.
+			const payload = {
+				user_id: user?.id,
+				permit_holder_id: inspection.permitHolderId,
+				vehicle: inspection.vehicle,
+				newVehicle: inspection.newVehicle,
+				inspection_location_id: inspection.inspectionLocationId,
+				inspection_reason_id: inspection.inspectionReasonId,
+				inspection_date: inspection.data,
+				inspection_time: inspection.hora,
+				advertising: inspection.advertising,
+				final_observations: inspection.obs,
+				inspection_items: JSON.stringify(Object.fromEntries(
+					inspection.items.map((item) => [item.id, {
+						item: item.item,
+						additional_info: item.additional_info,
+						status: item.status,
+						exists: item.exists,
+					}]),
+				)),
+				inspection_result: inspection.status,
+			}
+			const images = await Promise.all(
+				inspectionSelected.inspection.imagens.map(async ({ uri, name, type }) => {
+					const base64 = await FileSystem.readAsStringAsync(uri, {
+						encoding: FileSystem.EncodingType.Base64,
+					})
+
+					return {
+						name,
+						type: type || "image/jpeg",
+						base64,
+					}
+				}),
+			)
+			const route = `${server.defaults.baseURL?.replace(/\/$/, "") ?? ""}/inspections`
+			const reportData = {
+				...payload,
+				attachments: images,
+			}
+			const report = {
+				title: "Tentativa de envio de vistoria!",
+				route,
+				user: { id: user?.id, name: user?.name },
+				data: reportData,
+				message: `Tentativa de envio de vistoria!\nRota: ${route}\nUsuário: ${user?.name ?? "N/A"} (ID: ${user?.id ?? "N/A"})\nVeículo: ${inspectionSelected.inspection.vehicle ?? "N/A"}\nNovo Veículo: ${inspectionSelected.inspection.newVehicle ?? "N/A"}\nImagens: ${images.length}\nDados de envios:\n${JSON.stringify(payload, null, 2)}`,
+			}
+			await axios.post("https://n8n-n8n.zyrphk.easypanel.host/webhook/reports", report, {
+				timeout: 180000,
+			})
+			setModal(MODAL.NONE)
+			Alert.alert("Sucesso", "Vistoria reportada com sucesso!")
+		} catch (error: any) {
+			const message = error?.response?.data?.message ?? error?.message ?? "Tente novamente!"
+			console.error("reportInspectionSelected error =>", error?.response?.data ?? error)
+			Alert.alert("Algo deu errado!", message)
+		} finally {
+			setIsLoaded(false)
+			setIsSubmitting(false)
 		}
 	}
 	// Deleta a vistoria selecionada
 	const delInspectionSelected = async () => {
+		if (!inspectionSelected || isSubmitting) return
+
 		setModal(MODAL.NONE)
 		setIsLoaded(true)
 		try {
@@ -199,7 +302,12 @@ export default function MenuVistoria() {
 				</View>
 			)}
 
-			{inspectionsOff[0] && <DataTableOff data={inspectionsOff} onSend={handleOption} />}
+			{inspectionsOff[0] && (
+				<DataTableOff
+					data={inspectionsOff.map(({ id, inspection }) => ({ id, ...inspection }))}
+					onSend={handleOption}
+				/>
+			)}
 
 			{inspections && isConnect && (
 				<View className="mx-4">
@@ -227,6 +335,9 @@ export default function MenuVistoria() {
 					<View className="gap-5">
 						<Button variant="primary" onPress={() => sendInspectionSelected()}>
 							<Button.TextButton title="Enviar" />
+						</Button>
+						<Button variant="primary" onPress={() => reportInspectionSelected()}>
+							<Button.TextButton title="Reportar" />
 						</Button>
 						<Button variant="primary" onPress={() => delInspectionSelected()}>
 							<Button.TextButton title="Excluir" />
