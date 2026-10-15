@@ -43,3 +43,9 @@ yarn-error.*
 
 # Android keystore
 *.keystore
+
+# TEMP
+tmp/
+
+# Documentation
+docs/
