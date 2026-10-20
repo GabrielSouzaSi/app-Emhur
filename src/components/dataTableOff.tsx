@@ -23,9 +23,9 @@ const DataTableOff: React.FC<DataTableProps> = ({ data, onEdit, onSend }) => {
 	}
 
 	return (
-		<View className="flex-1 m-4 border-2 border-gray-300 rounded-md">
+		<View className="flex-1 m-4 border-2 border-red-500 rounded-md">
 			{/* Cabeçalho da Tabela */}
-			<View className="flex flex-row py-2 px-3 bg-white">
+			<View className="flex flex-row py-2 px-3 bg-red-500">
 				<View className="flex-1">
 					<Text className="text-gray-500 font-regular text-lg font-bold">Veículo</Text>
 				</View>
