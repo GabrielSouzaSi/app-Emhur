@@ -15,9 +15,9 @@ export function InspectionItem({ data, onSave }) {
 							...i,
 							exists: !i.exists,
 							status: !i.exists ? "apto" : "inapto", // <<< AQUI!!! automatiza o status
-					  }
-					: i
-			)
+						}
+					: i,
+			),
 		)
 	}, [])
 
@@ -45,7 +45,7 @@ export function InspectionItem({ data, onSave }) {
 				onChangeInfo={updateAdditionalInfo}
 			/>
 		),
-		[openDropdown, toggleExists, openOrClose, updateStatus, updateAdditionalInfo]
+		[openDropdown, toggleExists, openOrClose, updateStatus, updateAdditionalInfo],
 	)
 
 	return (
@@ -55,7 +55,7 @@ export function InspectionItem({ data, onSave }) {
 				renderItem={renderItem}
 				keyExtractor={(item) => String(item.id)}
 				showsVerticalScrollIndicator={false}
-				contentContainerStyle={{ paddingVertical: 16 }}
+				contentContainerStyle={{ paddingVertical: 16, paddingBottom: 300 }}
 				removeClippedSubviews={true}
 				maxToRenderPerBatch={12}
 				initialNumToRender={10}
