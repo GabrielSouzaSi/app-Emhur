@@ -3,8 +3,17 @@ import { memo } from "react"
 import { Switch, Text, TouchableOpacity, View } from "react-native"
 import { Field } from "./input"
 
+const CONSERVATION_OPTIONS = ["ÓTIMO", "BOM", "RAZOÁVEL"]
+
 export const InspectionItemCard = memo(
 	({ item, isOpen, onToggleExists, onOpenDropdown, onSelectStatus, onChangeInfo }: any) => {
+		const isConservation =
+			String(item.item ?? "")
+				.normalize("NFD")
+				.replace(/[\u0300-\u036f]/g, "")
+				.trim()
+				.toLowerCase() === "conservacao"
+
 		return (
 			<View
 				className="w-full p-4 mb-4 bg-white rounded-md border border-gray-300 gap-4"
@@ -60,6 +69,27 @@ export const InspectionItemCard = memo(
 						>
 							<Text className="text-lg font-semiBold text-white">Inapto</Text>
 						</TouchableOpacity>
+					</View>
+				)}
+
+				{isConservation && (
+					<View className="gap-2">
+						<Text className="font-semiBold text-lg">Estado de conservação</Text>
+						{CONSERVATION_OPTIONS.map((option) => (
+							<TouchableOpacity
+								key={option}
+								accessibilityRole="radio"
+								accessibilityState={{ checked: item.additional_info === option }}
+								className="rounded-md border-2 p-3"
+								style={{
+									borderColor: item.additional_info === option ? colors.blue[700] : "#d1d5db",
+									backgroundColor: item.additional_info === option ? "#dbeafe" : "#fff",
+								}}
+								onPress={() => onChangeInfo(item.id, option)}
+							>
+								<Text className="font-semiBold text-lg">{option}</Text>
+							</TouchableOpacity>
+						))}
 					</View>
 				)}
 
