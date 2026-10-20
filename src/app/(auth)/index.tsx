@@ -1,14 +1,15 @@
 import Constants from "expo-constants"
-import { useRouter } from "expo-router"
+import { useFocusEffect, useRouter } from "expo-router"
 import { FlatList, Text, View } from "react-native"
 
 import { HeaderMenu } from "@/components/headerMenu"
 import { MenuCard } from "@/components/menuCard"
 import { UpdateAppModal } from "@/components/UpdateAppModal"
 import { useAuth } from "@/hooks/useAuth"
+import { getDatabaseInspections } from "@/database/inspection"
 import { checkUpdate, UpdateInfo } from "@/utils/checkUpdate"
 import { update } from "@/utils/configDataApp"
-import { useState } from "react"
+import { useCallback, useState } from "react"
 import Toast from "react-native-toast-message"
 
 type MenuItemBase = {
@@ -30,6 +31,38 @@ export default function HomeFiscal() {
 	const versao = Constants.expoConfig?.version || "Desconhecida"
 
 	const router = useRouter()
+
+	const canViewInspections = can.hasTeam("DFT")
+
+	useFocusEffect(
+		useCallback(() => {
+			if (!canViewInspections) return
+			let active = true
+
+			async function notifyPendingInspections() {
+				try {
+					const pending = await getDatabaseInspections()
+					if (!active || pending.length === 0) return
+
+					Toast.show({
+						type: "info",
+						text1: pending.length === 1
+							? "Você tem 1 vistoria pendente"
+							: `Você tem ${pending.length} vistorias pendentes`,
+						text2: "Acesse Vistorias para conferir e enviar.",
+						visibilityTime: 6000,
+					})
+				} catch (error) {
+					console.error("Erro ao verificar vistorias pendentes:", error)
+				}
+			}
+
+			notifyPendingInspections()
+			return () => {
+				active = false
+			}
+		}, [canViewInspections]),
+	)
 
 	const COLUMNS = 2
 
