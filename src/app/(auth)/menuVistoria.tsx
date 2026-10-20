@@ -103,7 +103,9 @@ export default function MenuVistoria() {
 				(item: any) => item.id && item.plate_number?.trim().toUpperCase() === plate,
 			)
 			if (!newVehicle) {
-				throw new Error("Veículo não encontrado. Confira a placa informada ou verifique se o veículo já foi cadastrado.")
+				throw new Error(
+					"Veículo não encontrado. Confira a placa informada ou verifique se o veículo já foi cadastrado.",
+				)
 			}
 		}
 
@@ -194,14 +196,19 @@ export default function MenuVistoria() {
 				inspection_time: inspection.hora,
 				advertising: inspection.advertising,
 				final_observations: inspection.obs,
-				inspection_items: JSON.stringify(Object.fromEntries(
-					inspection.items.map((item) => [item.id, {
-						item: item.item,
-						additional_info: item.additional_info,
-						status: item.status,
-						exists: item.exists,
-					}]),
-				)),
+				inspection_items: JSON.stringify(
+					Object.fromEntries(
+						inspection.items.map((item) => [
+							item.id,
+							{
+								item: item.item,
+								additional_info: item.additional_info,
+								status: item.status,
+								exists: item.exists,
+							},
+						]),
+					),
+				),
 				inspection_result: inspection.status,
 			}
 			const images = await Promise.all(
@@ -244,21 +251,36 @@ export default function MenuVistoria() {
 		}
 	}
 	// Deleta a vistoria selecionada
-	const delInspectionSelected = async () => {
+	const delInspectionSelected = () => {
 		if (!inspectionSelected || isSubmitting) return
 
-		setModal(MODAL.NONE)
-		setIsLoaded(true)
-		try {
-			await delDatabaseInspectionId(inspectionSelected.id)
-			await getInspections()
-			Alert.alert("Aviso!", "Vistoria excluída com sucesso!")
-		} catch (error) {
-			setIsLoaded(false)
-			Alert.alert("Algo deu errado!", "Tente novamente!")
-		} finally {
-			setIsLoaded(false)
-		}
+		Alert.alert(
+			"Excluir vistoria",
+			"Deseja realmente excluir a vistoria selecionada? Essa ação não pode ser desfeita.",
+			[
+				{ text: "Cancelar", style: "cancel" },
+				{
+					text: "Excluir",
+					style: "destructive",
+					onPress: async () => {
+						setIsSubmitting(true)
+						setModal(MODAL.NONE)
+						setIsLoaded(true)
+						try {
+							await delDatabaseInspectionId(inspectionSelected.id)
+							await getInspections()
+							Alert.alert("Aviso!", "Vistoria excluída com sucesso!")
+						} catch (error) {
+							Alert.alert("Algo deu errado!", "Tente novamente!")
+						} finally {
+							setIsLoaded(false)
+							setIsSubmitting(false)
+						}
+					},
+				},
+			],
+			{ cancelable: true },
+		)
 	}
 
 	useFocusEffect(
@@ -282,9 +304,9 @@ export default function MenuVistoria() {
 			{isLoaded && <LoadingLight />}
 
 			{inspectionsOff[0] ? (
-				<View className="mx-4">
+				<View className="mx-4 mt-4">
 					<Text className="text-gray-500 font-regular text-2xl font-bold">
-						Vistoria Pendentes ({inspectionsOff.length}):
+						Vistorias Pendentes ({inspectionsOff.length}):
 					</Text>
 				</View>
 			) : (
