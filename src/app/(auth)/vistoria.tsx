@@ -115,15 +115,21 @@ export default function Vistoria() {
 	const [modal, setModal] = useState(MODAL.NONE)
 
 	// Buscar veículo
-	async function searchPlate(req: any) {
+	async function searchVehicleNumber(value: string | undefined) {
 		Keyboard.dismiss()
+		const number = value?.trim()
+		if (!number || !/^\d+$/.test(number)) {
+			setError("numero", { type: "validate", message: "Informe somente o número do veículo!" })
+			return
+		}
+		clearErrors("numero")
 		setVehicle(undefined)
 		setPermitHolder(undefined)
 		setPermitType("")
 		setAlvara(undefined)
 		try {
 			setIsLoaded(true)
-			const { data } = await server.get(`/vehicle/${req}`)
+			const { data } = await server.get(`/vehicle/${number}`)
 			// console.log(JSON.stringify(data, null, 2));
 
 			const { permit_holder_id, vehicle_id } = data ?? {}
@@ -208,13 +214,20 @@ export default function Vistoria() {
 		try {
 			const data: any = await getDatabaseReasonItemId(id)
 			let result = data.map((data: any) => {
+				const itemName = String(data.item ?? "")
+					.normalize("NFD")
+					.replace(/[\u0300-\u036f]/g, "")
+					.trim()
+					.toLowerCase()
+				const defaultsToNotExisting = ["publicidade", "insulfilm (para-brisas)"].includes(itemName)
+
 				return {
 					id: data.id,
 					item: data.item,
 					description: data.description,
 					additional_info: "",
 					status: "apto",
-					exists: true,
+					exists: !defaultsToNotExisting,
 				}
 			})
 			setInspectionItems(result)
@@ -466,18 +479,19 @@ export default function Vistoria() {
 								name="numero"
 								rules={{
 									required: "Informe o Número do Veículo!",
+									pattern: { value: /^\d+$/, message: "Informe somente o número do veículo!" },
 								}}
 								render={({ field: { onChange, value } }) => (
 									<Search
 										errorMessage={errors.numero?.message}
-										placeholder="Número ou Placa do Veículo"
+										placeholder="Número do Veículo"
 										onChangeText={onChange}
 										value={value}
-										onSubmitEditing={() => searchPlate(value)}
+										onSubmitEditing={() => searchVehicleNumber(value)}
 										returnKeyType="send"
-										keyboardType="default"
-										autoCapitalize="characters"
-										onSearch={() => searchPlate(value)}
+										keyboardType="number-pad"
+										autoCapitalize="none"
+										onSearch={() => searchVehicleNumber(value)}
 									/>
 								)}
 							/>
